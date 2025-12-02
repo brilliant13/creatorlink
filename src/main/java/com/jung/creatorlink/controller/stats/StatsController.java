@@ -1,5 +1,6 @@
 package com.jung.creatorlink.controller.stats;
 
+import com.jung.creatorlink.dto.stats.CampaignStatsResponse;
 import com.jung.creatorlink.dto.stats.CreatorStatsResponse;
 import com.jung.creatorlink.service.stats.StatsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,5 +29,12 @@ public class StatsController {
         //나중에 JWT 붙이면 @RequestParam 제거하고
         //SecurityContext에서 현재 로그인한 광고주의 id를 가져오자.
         return statsService.getCreatorStats(advertiserId);
+    }
+
+    @GetMapping("/campaigns")
+    @Operation(summary = "캠페인별 클릭 통계",
+            description = "광고주(advertiserId) 기준으로 캠페인별 총 클릭 수를 조회한다.")
+    public List<CampaignStatsResponse> getCampaignStats(@RequestParam Long advertiserId) {
+        return statsService.getCampaignStats(advertiserId);
     }
 }

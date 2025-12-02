@@ -1,5 +1,6 @@
 package com.jung.creatorlink.service.stats;
 
+import com.jung.creatorlink.dto.stats.CampaignStatsResponse;
 import com.jung.creatorlink.dto.stats.CreatorStatsResponse;
 import com.jung.creatorlink.repository.tracking.ClickLogRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,5 +19,10 @@ public class StatsService {
     // 광고주별 크리에이터 클릭 통계
     public List<CreatorStatsResponse> getCreatorStats(Long advertiserId) {
         return clickLogRepository.findCreatorStatsByAdvertiserId(advertiserId);
+    }
+
+    // 광고주별 캠페인 클릭 통계
+    public List<CampaignStatsResponse> getCampaignStats(Long advertiserId) {
+        return clickLogRepository.findCampaignStatsByAdvertiserId(advertiserId);
     }
 }
