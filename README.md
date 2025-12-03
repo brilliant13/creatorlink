@@ -78,7 +78,7 @@ CreatorLink는 다음과 같은 흐름으로 문제를 해결합니다:
     * 동시에 DB에 클릭 로그 적재
   * IP, User-Agent, Referer, Timestamp 등 기록 (필드 구성은 실제 구현 기준)
 
-* **통계/리포트 (개발 중 / 계획)**
+* **통계/리포트**
 
   * 크리에이터별 누적 클릭 수
   * 캠페인별 클릭 수, 기간별 추이
@@ -90,7 +90,7 @@ CreatorLink는 다음과 같은 흐름으로 문제를 해결합니다:
 
 ### 3-1. 전체 구조
 
-```
+```text
 [Client(React)]  --- HTTP/JSON --->  [Spring Boot API Server]  --- JPA ---> [MySQL]
 
                                └--- (optional) Redis cache for hot stats
@@ -160,7 +160,7 @@ CreatorLink는 다음과 같은 흐름으로 문제를 해결합니다:
 
 ### 4-2. ERD (예시)
 
-```
+```text
 User (Advertiser)
   ├─ Campaign (1:N)
   └─ Creator (1:N)
@@ -184,22 +184,49 @@ TrackingLink
 
 ### 5-1. URL 설계 개요
 
-* `POST   /api/users`              – 광고주 회원 가입 (optional)
-* `POST   /api/campaigns`          – 캠페인 생성
-* `GET    /api/campaigns`          – 광고주별 캠페인 목록 조회
-* `POST   /api/creators`           – 크리에이터 생성
-* `GET    /api/creators`           – 광고주별 크리에이터 목록 조회
-* `POST   /api/tracking-links`     – 트래킹 링크 생성
-* `GET    /api/tracking-links`     – 캠페인 or 크리에이터별 링크 조회
-* `GET    /t/{slug}`               – 트래킹 링크 라우팅 + 클릭 로그 기록
-* `GET    /api/stats/campaigns`    – 캠페인별 통계
-* `GET    /api/stats/creators`     – 크리에이터별 통계
+* `POST   /api/users`               – 광고주 회원 가입 (optional)
+
+* `POST   /api/auth/signup`         – 회원가입
+
+* `POST   /api/auth/login`          – 로그인
+
+* `POST   /api/campaigns`           – 캠페인 생성
+
+* `GET    /api/campaigns`           – 광고주별 캠페인 목록 조회
+
+* `GET    /api/campaigns/{id}`      – 캠페인 단건 조회
+
+* `PUT    /api/campaigns/{id}`      – 캠페인 수정
+
+* `DELETE /api/campaigns/{id}`      – 캠페인 삭제 (soft delete)
+
+* `POST   /api/creators`            – 크리에이터 생성
+
+* `GET    /api/creators`            – 광고주별 크리에이터 목록 조회
+
+* `GET    /api/creators/{id}`       – 크리에이터 단건 조회
+
+* `PUT    /api/creators/{id}`       – 크리에이터 수정
+
+* `DELETE /api/creators/{id}`       – 크리에이터 삭제 (soft delete)
+
+* `POST   /api/tracking-links`      – 트래킹 링크 생성
+
+* `GET    /api/tracking-links`      – 캠페인 or 크리에이터별 링크 조회
+
+* `DELETE /api/tracking-links/{id}` – 트래킹 링크 삭제 (soft delete)
+
+* `GET    /t/{slug}`                – 트래킹 링크 라우팅 + 클릭 로그 기록
+
+* `GET    /api/stats/campaigns`     – 캠페인별 통계
+
+* `GET    /api/stats/creators`      – 크리에이터별 통계
 
 ### 5-2. 예시 API – 트래킹 링크 생성
 
 요청:
 
-```
+```http
 POST /api/tracking-links
 Content-Type: application/json
 
@@ -212,7 +239,7 @@ Content-Type: application/json
 
 응답 (201 Created):
 
-```
+```json
 {
   "id": 10,
   "slug": "ab12cd",
@@ -226,7 +253,7 @@ Content-Type: application/json
 
 요청:
 
-```
+```http
 GET /t/ab12cd
 ```
 
@@ -248,7 +275,7 @@ GET /t/ab12cd
 
 ### 6-2. 환경 변수 설정 예시 (`application.yml`)
 
-```
+```yaml
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/creatorlink?useSSL=false&serverTimezone=Asia/Seoul
@@ -269,13 +296,13 @@ spring:
 
 Gradle 사용 시:
 
-```
+```bash
 ./gradlew bootRun
 ```
 
 Maven 사용 시:
 
-```
+```bash
 ./mvnw spring-boot:run
 ```
 
@@ -289,25 +316,30 @@ Maven 사용 시:
 
 ## 7. 폴더 구조 (예시)
 
-```
+```text
 backend/
   src/
     main/
-      java/com/creatorlink/
+      java/com/jung/creatorlink/
         domain/
           user/
           campaign/
           creator/
-          trackinglink/
-          clicklog/
-        api/
-          controller/
-          dto/
-        service/
+          tracking/
+            TrackingLink.java
+            ClickLog.java
+        dto/
+          user/
+          campaign/
+          creator/
+          tracking/
+          stats/
         repository/
+        service/
+        controller/
       resources/
         application.yml
-  build.gradle (or pom.xml)
+  build.gradle
 
 frontend/
   src/
@@ -348,6 +380,61 @@ docs/
   * 일별 집계 테이블 도입 (예: `daily_click_stats`)
   * Redis 캐시 활용으로 “실시간 조회” 성능 최적화 여지 확보
 
+### 8-4. Soft Delete & Data Retention
+
+CreatorLink에서는 **중요 도메인 엔티티에 soft delete 전략**을 적용했습니다.
+
+* 대상 엔티티:
+
+  * `Campaign`
+  * `Creator`
+  * `TrackingLink`
+* 각 엔티티는 `Status` 필드를 갖습니다:
+
+  * `ACTIVE` : 서비스에서 사용 중인 데이터
+  * `INACTIVE` : 삭제 처리된(숨겨진) 데이터
+
+#### 삭제 정책
+
+* API 레벨에서의 “삭제” 요청은 실제 DB `DELETE`가 아니라,
+  `status = INACTIVE` 로 변경하는 방식으로 처리합니다.
+* 조회 시에는 기본적으로 `status = ACTIVE` 인 데이터만 노출합니다.
+
+  * 예: 캠페인 목록, 크리에이터 목록, 트래킹 링크 목록 등
+
+#### Soft delete를 선택한 이유
+
+1. **실수/버그에 대한 방어**
+
+   * 잘못된 요청으로 삭제해도, 데이터가 물리적으로 사라지지 않기 때문에
+     `status`를 다시 `ACTIVE`로 돌려 복구할 수 있습니다.
+2. **참조 무결성 & 이력 보존**
+
+   * `TrackingLink`, `ClickLog` 등 다른 테이블이 참조하는 엔티티를 바로 지우면
+     FK 제약 조건이나 통계/로그 데이터가 꼬일 수 있습니다.
+   * soft delete를 사용하면 **Campaign/Creator/TrackingLink 이력**을 남기면서도
+     UI/리다이렉트에서는 “삭제된 것처럼” 숨길 수 있습니다.
+3. **광고 도메인의 특성**
+
+   * “지금은 계약이 끝난 크리에이터/캠페인”이라도
+     과거 성과는 여전히 의미가 있습니다.
+   * soft delete를 통해 과거 캠페인/크리에이터 성과를 분석할 수 있는 여지를 남깁니다.
+
+#### Data Retention (향후 계획)
+
+* 장기적으로는, **오래된 INACTIVE 데이터**에 대해:
+
+  * 예: `INACTIVE && updatedAt < 6개월 전`
+  * 배치 작업(예: `@Scheduled`)으로 물리 삭제하는 전략을 고려하고 있습니다.
+* 이를 통해:
+
+  * 단기적으로는 복구 가능성을 유지하고
+  * 장기적으로는 DB 스토리지 사용량을 관리하는 **균형 잡힌 구조**를 목표로 합니다.
+
+> 이 구조를 통해
+> “중요 도메인 데이터는 바로 지우지 않고,
+> 비즈니스/운영 관점에서 안전하게 관리한다”는 설계를 유지하고 있습니다.
+
 ---
 
 ## 9. 향후 계획 (Roadmap)
@@ -357,6 +444,7 @@ docs/
 * [ ] 일별/주별 통계 집계 배치 작업
 * [ ] Redis 캐시 도입으로 실시간 대시보드 성능 개선
 * [ ] Admin 페이지에서 간단한 그래프 시각화 (React + Chart 라이브러리)
+* [ ] Soft delete 데이터에 대한 retention 배치(오래된 INACTIVE 물리 삭제)
 * [ ] 다국어(영문) 지원 및 글로벌 캠페인 관리 기능
 
 ---
@@ -366,5 +454,3 @@ docs/
 * **이름**: 정웅 (Jung Woong)
 * **Role**: 개인 사이드 프로젝트 – 설계부터 백엔드 구현 및 인프라까지 전담
 * **Contact**: (이메일), (GitHub 프로필 링크)
-
----
