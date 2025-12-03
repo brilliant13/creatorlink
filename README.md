@@ -175,8 +175,12 @@ TrackingLink
   └─ ClickLog (1:N)
 ```
 
+<!--
 > 실제 ERD 다이어그램은 `docs/erd.png` 등으로 저장 후
 > `![ERD](docs/erd.png)` 형태로 README에 추가할 수 있습니다.
+-->
+
+![ERD](docs/erd.png)
 
 ---
 
