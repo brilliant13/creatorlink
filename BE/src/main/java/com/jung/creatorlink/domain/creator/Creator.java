@@ -4,6 +4,7 @@ import com.jung.creatorlink.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -37,4 +38,16 @@ public class Creator {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    @Column
+    private LocalDateTime updatedAt;
+
+
+    public void update(String name, String channelName, String channelUrl, String note) {
+        this.name = name;
+        this.channelName = channelName;
+        this.channelUrl = channelUrl;
+        this.note = note;
+        this.updatedAt = LocalDateTime.now();
+    }
 }

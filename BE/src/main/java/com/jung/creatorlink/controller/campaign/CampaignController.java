@@ -3,6 +3,7 @@ package com.jung.creatorlink.controller.campaign;
 
 import com.jung.creatorlink.dto.campaign.CampaignCreateRequest;
 import com.jung.creatorlink.dto.campaign.CampaignResponse;
+import com.jung.creatorlink.dto.campaign.CampaignUpdateRequest;
 import com.jung.creatorlink.service.campaign.CampaignService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,5 +50,30 @@ public class CampaignController {
         //Securit에서 꺼낸 현재 로그인 유저의 id를 쓰게 바꾸면 됨.
         return campaignService.getCampaign(id, advertiserId);
     }
+
+    // 캠페인 수정
+    @PutMapping("/{id}")
+    @Operation(summary = "캠페인 수정",
+            description = "캠페인 기본 정보(이름, 설명, 기간, 랜딩 URL)를 수정한다.")
+    public CampaignResponse updateCampaign(
+            @PathVariable Long id,
+            @Valid @RequestBody CampaignUpdateRequest request
+    ) {
+        return campaignService.updateCampaign(id, request);
+    }
+
+    // 캠페인 삭제
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "캠페인 삭제",
+            description = "광고주가 소유한 캠페인을 삭제한다. "
+                    + "단, 연결된 트래킹 링크가 있으면 삭제 불가.")
+    public void deleteCampaign(
+            @PathVariable Long id,
+            @RequestParam Long advertiserId
+    ) {
+        campaignService.deleteCampaign(id, advertiserId);
+    }
+
 
 }

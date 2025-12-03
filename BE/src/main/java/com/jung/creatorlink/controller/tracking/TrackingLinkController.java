@@ -39,4 +39,14 @@ public class TrackingLinkController {
     public List<TrackingLinkResponse> getTrackingLinksByCampaign(@RequestParam Long campaignId) {
         return trackingLinkService.getTrackingLinksByCampaign(campaignId);
     }
+
+    // 트래킹 링크 삭제
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "트래킹 링크 삭제",
+            description = "특정 트래킹 링크를 삭제한다. "
+                    + "캠페인/크리에이터 삭제 전 정리 용도.")
+    public void deleteTrackingLink(@PathVariable Long id) {
+        trackingLinkService.deleteTrackingLink(id);
+    }
 }

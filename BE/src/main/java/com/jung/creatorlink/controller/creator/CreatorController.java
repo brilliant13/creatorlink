@@ -2,6 +2,7 @@ package com.jung.creatorlink.controller.creator;
 
 import com.jung.creatorlink.dto.creator.CreatorCreateRequest;
 import com.jung.creatorlink.dto.creator.CreatorResponse;
+import com.jung.creatorlink.dto.creator.CreatorUpdateRequest;
 import com.jung.creatorlink.service.creator.CreatorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,4 +47,29 @@ public class CreatorController {
         // 현재 로그인 유저 ID를 Security에서 꺼내서 쓸 예정.
         return creatorService.getCreator(id, advertiserId);
     }
+
+    // 크리에이터 수정
+    @PutMapping("/{id}")
+    @Operation(summary = "크리에이터 수정")
+    public CreatorResponse updateCreator(
+            @PathVariable Long id,
+            @Valid @RequestBody CreatorUpdateRequest request
+    ) {
+        return creatorService.updateCreator(id, request);
+    }
+
+    // 크리에이터 삭제
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "크리에이터 삭제",
+            description = "광고주가 소유한 크리에이터를 삭제한다. "
+                    + "단, 연결된 트래킹 링크가 있으면 삭제 불가.")
+    public void deleteCreator(
+            @PathVariable Long id,
+            @RequestParam Long advertiserId
+    ) {
+        creatorService.deleteCreator(id, advertiserId);
+    }
+
+
 }

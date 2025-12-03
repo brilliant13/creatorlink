@@ -5,7 +5,9 @@ import com.jung.creatorlink.domain.campaign.Campaign;
 import com.jung.creatorlink.domain.user.User;
 import com.jung.creatorlink.dto.campaign.CampaignCreateRequest;
 import com.jung.creatorlink.dto.campaign.CampaignResponse;
+import com.jung.creatorlink.dto.campaign.CampaignUpdateRequest;
 import com.jung.creatorlink.repository.campaign.CampaignRepository;
+import com.jung.creatorlink.repository.tracking.TrackingLinkRepository;
 import com.jung.creatorlink.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.List;
 public class CampaignService {
     private final CampaignRepository campaignRepository;
     private final UserRepository userRepository;
+    private final TrackingLinkRepository trackingLinkRepository;
 
 
     public CampaignResponse createCampaign(CampaignCreateRequest request) {
@@ -71,6 +74,47 @@ public class CampaignService {
         }
         return toResponse(campaign);
     }
+
+    @Transactional
+    public CampaignResponse updateCampaign(Long id, CampaignUpdateRequest request) {
+        Campaign campaign = campaignRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 캠페인입니다."));
+
+        // 광고주 소유 검증 (임시 – 나중에 JWT로 교체)
+        if (!campaign.getAdvertiser().getId().equals(request.getAdvertiserId())) {
+            throw new IllegalArgumentException("이 캠페인을 수정할 권한이 없습니다.");
+        }
+
+        //  엔티티 헬퍼 메서드 재사용
+        campaign.update(
+                request.getName(),
+                request.getDescription(),
+                request.getLandingUrl(),
+                request.getStartDate(),
+                request.getEndDate()
+        );
+
+        return CampaignResponse.from(campaign);
+    }
+
+    @Transactional
+    public void deleteCampaign(Long id, Long advertiserId) {
+        Campaign campaign = campaignRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 캠페인입니다."));
+
+        if (!campaign.getAdvertiser().getId().equals(advertiserId)) {
+            throw new IllegalArgumentException("이 캠페인을 삭제할 권한이 없습니다.");
+        }
+
+        // ✅ 연결된 TrackingLink 있으면 삭제 막기
+        if (trackingLinkRepository.existsByCampaign_Id(id)) {
+            throw new IllegalStateException("이 캠페인에 연결된 트래킹 링크가 있어 삭제할 수 없습니다. "
+                    + "먼저 관련 트래킹 링크를 삭제해주세요.");
+        }
+
+        campaignRepository.delete(campaign);
+    }
+
 
 
     private CampaignResponse toResponse(Campaign campaign) {

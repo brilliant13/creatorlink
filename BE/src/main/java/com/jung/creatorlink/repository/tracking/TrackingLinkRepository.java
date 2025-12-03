@@ -14,4 +14,9 @@ public interface TrackingLinkRepository extends JpaRepository<TrackingLink, Long
 
     // 캠페인 ID 기준 모든 트래킹 링크 조회
     List<TrackingLink> findAllByCampaignId(Long campaignId);
+
+    boolean existsByCampaign_Id(Long campaignId);
+
+    boolean existsByCreator_Id(Long creatorId);
+
 }

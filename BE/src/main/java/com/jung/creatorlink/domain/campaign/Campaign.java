@@ -53,4 +53,5 @@ public class Campaign {
         this.endDate = endDate;
         this.updatedAt = LocalDateTime.now();
     }
+
 }

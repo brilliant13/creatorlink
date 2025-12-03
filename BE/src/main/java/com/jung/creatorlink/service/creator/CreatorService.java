@@ -4,7 +4,9 @@ import com.jung.creatorlink.domain.creator.Creator;
 import com.jung.creatorlink.domain.user.User;
 import com.jung.creatorlink.dto.creator.CreatorCreateRequest;
 import com.jung.creatorlink.dto.creator.CreatorResponse;
+import com.jung.creatorlink.dto.creator.CreatorUpdateRequest;
 import com.jung.creatorlink.repository.creator.CreatorRepository;
+import com.jung.creatorlink.repository.tracking.TrackingLinkRepository;
 import com.jung.creatorlink.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ public class CreatorService {
 
     private final CreatorRepository creatorRepository;
     private final UserRepository userRepository;
+    private final TrackingLinkRepository trackingLinkRepository;
 
     //크리에이터 생성
     public CreatorResponse createCreator(CreatorCreateRequest request) {
@@ -65,6 +68,46 @@ public class CreatorService {
         }
         return toResponse(creator);
     }
+
+    @Transactional
+    public CreatorResponse updateCreator(Long id, CreatorUpdateRequest request) {
+        Creator creator = creatorRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 크리에이터입니다."));
+
+        if (!creator.getAdvertiser().getId().equals(request.getAdvertiserId())) {
+            throw new IllegalArgumentException("이 크리에이터를 수정할 권한이 없습니다.");
+        }
+
+
+        // 엔티티의 update 헬퍼 메서드 사용
+        creator.update(
+                request.getName(),
+                request.getChannelName(),
+                request.getChannelUrl(),
+                request.getNote()
+        );
+
+        // 수정된 엔티티를 DTO로 변환
+        return CreatorResponse.from(creator);
+    }
+
+    @Transactional
+    public void deleteCreator(Long id, Long advertiserId) {
+        Creator creator = creatorRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 크리에이터입니다."));
+
+        if (!creator.getAdvertiser().getId().equals(advertiserId)) {
+            throw new IllegalArgumentException("이 크리에이터를 삭제할 권한이 없습니다.");
+        }
+
+        if (trackingLinkRepository.existsByCreator_Id(id)) {
+            throw new IllegalStateException("이 크리에이터에 연결된 트래킹 링크가 있어 삭제할 수 없습니다. "
+                    + "먼저 관련 트래킹 링크를 삭제해주세요.");
+        }
+
+        creatorRepository.delete(creator);
+    }
+
 
     private CreatorResponse toResponse(Creator creator) {
         return CreatorResponse.builder()

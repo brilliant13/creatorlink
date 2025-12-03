@@ -134,4 +134,13 @@ public class TrackingLinkService {
         }
         return ip;
     }
+
+    @Transactional
+    public void deleteTrackingLink(Long id) {
+        TrackingLink link = trackingLinkRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 트래킹 링크입니다."));
+
+        trackingLinkRepository.delete(link);
+    }
+
 }
