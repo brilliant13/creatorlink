@@ -1,5 +1,6 @@
 package com.jung.creatorlink.domain.campaign;
 
+import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -14,6 +15,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class Campaign {
+
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,6 +47,21 @@ public class Campaign {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Status status = Status.ACTIVE;
+
+    public void deactivate() {
+        this.status = Status.INACTIVE;
+        this.updatedAt = LocalDateTime.now(); // updatedAt 쓰고 있다면
+    }
+
+    public boolean isActive() {
+        return this.status == Status.ACTIVE;
+    }
+
     //나중에 수정할 때 쓸 수 있도록 헬퍼 메서드 하나 정도
     public void update(String name, String description, String landingUrl, LocalDate startDate, LocalDate endDate) {
         this.name = name;
@@ -53,5 +71,24 @@ public class Campaign {
         this.endDate = endDate;
         this.updatedAt = LocalDateTime.now();
     }
+
+
+    public CampaignState calculateState() {
+        LocalDate today = LocalDate.now();
+        // 시작일이 설정돼 있고, 아직 시작 전이면
+        if (startDate != null && today.isBefore(startDate)) {
+            return CampaignState.UPCOMING;
+        }
+
+        // 종료일이 설정돼 있고, 이미 종료일이 지났으면
+        if (endDate != null && today.isAfter(endDate)) {
+            return CampaignState.ENDED;
+        }
+
+        // 나머지는 모두 "진행 중"으로 본다
+        return CampaignState.RUNNING;
+    }
+
+
 
 }

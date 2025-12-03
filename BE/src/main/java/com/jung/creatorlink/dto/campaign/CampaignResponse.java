@@ -1,6 +1,7 @@
 package com.jung.creatorlink.dto.campaign;
 
 import com.jung.creatorlink.domain.campaign.Campaign;
+import com.jung.creatorlink.domain.campaign.CampaignState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,6 +20,7 @@ public class CampaignResponse {
     private String landingUrl;
     private LocalDate startDate;
     private LocalDate endDate;
+    private CampaignState state;
 
     //엔티티 → DTO 변환 메서드
     public static CampaignResponse from(Campaign campaign) {
@@ -30,6 +32,7 @@ public class CampaignResponse {
                 .landingUrl(campaign.getLandingUrl())
                 .startDate(campaign.getStartDate())
                 .endDate(campaign.getEndDate())
+                .state(campaign.calculateState())
                 .build();
     }
 

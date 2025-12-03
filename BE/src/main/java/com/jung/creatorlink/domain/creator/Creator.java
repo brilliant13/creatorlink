@@ -1,5 +1,6 @@
 package com.jung.creatorlink.domain.creator;
 
+import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -42,6 +43,10 @@ public class Creator {
     @Column
     private LocalDateTime updatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Status status = Status.ACTIVE;
+
 
     public void update(String name, String channelName, String channelUrl, String note) {
         this.name = name;
@@ -49,5 +54,14 @@ public class Creator {
         this.channelUrl = channelUrl;
         this.note = note;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void deactivate() {
+        this.status = Status.INACTIVE;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isActive() {
+        return this.status == Status.ACTIVE;
     }
 }

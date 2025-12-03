@@ -2,6 +2,7 @@ package com.jung.creatorlink.service.campaign;
 
 
 import com.jung.creatorlink.domain.campaign.Campaign;
+import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.user.User;
 import com.jung.creatorlink.dto.campaign.CampaignCreateRequest;
 import com.jung.creatorlink.dto.campaign.CampaignResponse;
@@ -56,7 +57,10 @@ public class CampaignService {
 
     @Transactional(readOnly = true)
     public List<CampaignResponse> getCampaignsByAdvertiser(Long advertiserId) {
-        List<Campaign> campaigns = campaignRepository.findByAdvertiserId(advertiserId);
+//        List<Campaign> campaigns = campaignRepository.findByAdvertiserId(advertiserId);
+        List<Campaign> campaigns =
+                campaignRepository.findAllByAdvertiserIdAndStatus(advertiserId, Status.ACTIVE);
+
         //List<Campaign> -> Stream<Campaign> -> (toResponse 메소드 거치고) -> List<Campaign>
         //스트림객체에서 스트림객체로. 매핑. map()
         return campaigns.stream()
@@ -97,6 +101,25 @@ public class CampaignService {
         return CampaignResponse.from(campaign);
     }
 
+//    @Transactional
+//    public void deleteCampaign(Long id, Long advertiserId) {
+//        Campaign campaign = campaignRepository.findById(id)
+//                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 캠페인입니다."));
+//
+//        if (!campaign.getAdvertiser().getId().equals(advertiserId)) {
+//            throw new IllegalArgumentException("이 캠페인을 삭제할 권한이 없습니다.");
+//        }
+//
+//        //  연결된 TrackingLink 있으면 삭제 막기
+//        if (trackingLinkRepository.existsByCampaign_Id(id)) {
+//            throw new IllegalStateException("이 캠페인에 연결된 트래킹 링크가 있어 삭제할 수 없습니다. "
+//                    + "먼저 관련 트래킹 링크를 삭제해주세요.");
+//        }
+//
+//        campaignRepository.delete(campaign);
+//    }
+
+    //soft delete
     @Transactional
     public void deleteCampaign(Long id, Long advertiserId) {
         Campaign campaign = campaignRepository.findById(id)
@@ -106,26 +129,22 @@ public class CampaignService {
             throw new IllegalArgumentException("이 캠페인을 삭제할 권한이 없습니다.");
         }
 
-        // ✅ 연결된 TrackingLink 있으면 삭제 막기
-        if (trackingLinkRepository.existsByCampaign_Id(id)) {
-            throw new IllegalStateException("이 캠페인에 연결된 트래킹 링크가 있어 삭제할 수 없습니다. "
-                    + "먼저 관련 트래킹 링크를 삭제해주세요.");
-        }
-
-        campaignRepository.delete(campaign);
+        //  실제 삭제가 아니라 상태만 변경
+        campaign.deactivate();
     }
 
 
 
     private CampaignResponse toResponse(Campaign campaign) {
-        return CampaignResponse.builder()
-                .id(campaign.getId())
-                .advertiserId(campaign.getAdvertiser().getId())
-                .name(campaign.getName())
-                .description(campaign.getDescription())
-                .landingUrl(campaign.getLandingUrl())
-                .startDate(campaign.getStartDate())
-                .endDate(campaign.getEndDate())
-                .build();
+        return CampaignResponse.from(campaign);
+//        return CampaignResponse.builder()
+//                .id(campaign.getId())
+//                .advertiserId(campaign.getAdvertiser().getId())
+//                .name(campaign.getName())
+//                .description(campaign.getDescription())
+//                .landingUrl(campaign.getLandingUrl())
+//                .startDate(campaign.getStartDate())
+//                .endDate(campaign.getEndDate())
+//                .build();
     }
 }

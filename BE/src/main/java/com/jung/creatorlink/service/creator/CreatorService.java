@@ -1,5 +1,6 @@
 package com.jung.creatorlink.service.creator;
 
+import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.creator.Creator;
 import com.jung.creatorlink.domain.user.User;
 import com.jung.creatorlink.dto.creator.CreatorCreateRequest;
@@ -50,7 +51,8 @@ public class CreatorService {
     //광고주별 Creator 목록 조회
     @Transactional(readOnly = true)
     public List<CreatorResponse> getCreatorsByAdvertiser(Long advertiserId) {
-        List<Creator> creators = creatorRepository.findAllByAdvertiserId(advertiserId);
+//        List<Creator> creators = creatorRepository.findAllByAdvertiserId(advertiserId);
+        List<Creator> creators = creatorRepository.findAllByAdvertiserIdAndStatus(advertiserId, Status.ACTIVE);
         return creators.stream()
                 .map(this::toResponse)
                 .toList();
@@ -91,6 +93,24 @@ public class CreatorService {
         return CreatorResponse.from(creator);
     }
 
+//    @Transactional
+//    public void deleteCreator(Long id, Long advertiserId) {
+//        Creator creator = creatorRepository.findById(id)
+//                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 크리에이터입니다."));
+//
+//        if (!creator.getAdvertiser().getId().equals(advertiserId)) {
+//            throw new IllegalArgumentException("이 크리에이터를 삭제할 권한이 없습니다.");
+//        }
+//
+//        if (trackingLinkRepository.existsByCreator_Id(id)) {
+//            throw new IllegalStateException("이 크리에이터에 연결된 트래킹 링크가 있어 삭제할 수 없습니다. "
+//                    + "먼저 관련 트래킹 링크를 삭제해주세요.");
+//        }
+//
+//        creatorRepository.delete(creator);
+//    }
+
+    //soft delete
     @Transactional
     public void deleteCreator(Long id, Long advertiserId) {
         Creator creator = creatorRepository.findById(id)
@@ -100,12 +120,7 @@ public class CreatorService {
             throw new IllegalArgumentException("이 크리에이터를 삭제할 권한이 없습니다.");
         }
 
-        if (trackingLinkRepository.existsByCreator_Id(id)) {
-            throw new IllegalStateException("이 크리에이터에 연결된 트래킹 링크가 있어 삭제할 수 없습니다. "
-                    + "먼저 관련 트래킹 링크를 삭제해주세요.");
-        }
-
-        creatorRepository.delete(creator);
+        creator.deactivate();
     }
 
 

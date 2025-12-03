@@ -74,6 +74,11 @@ public class TrackingLinkService {
         TrackingLink trackingLink = trackingLinkRepository.findBySlug(slug)
                 .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 링크입니다."));
 
+        if (!trackingLink.isActive()) {
+            // 비활성 링크 처리: 404 던지거나, "만료된 링크" 페이지로 redirect
+            throw new IllegalStateException("비활성화된 링크입니다.");
+        }
+
         //클릭 로그 저장 ( 동기 버전)
         ClickLog log = ClickLog.builder()
                 .trackingLink(trackingLink)
@@ -135,12 +140,21 @@ public class TrackingLinkService {
         return ip;
     }
 
+//    @Transactional
+//    public void deleteTrackingLink(Long id) {
+//        TrackingLink link = trackingLinkRepository.findById(id)
+//                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 트래킹 링크입니다."));
+//
+//        trackingLinkRepository.delete(link);
+//    }
+
+    //soft delete
     @Transactional
     public void deleteTrackingLink(Long id) {
         TrackingLink link = trackingLinkRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 트래킹 링크입니다."));
 
-        trackingLinkRepository.delete(link);
+        link.deactivate();
     }
 
 }

@@ -29,7 +29,7 @@ export default function DashboardPage() {
         fetchStats()
 
         // 30초마다 자동 갱신
-        const interval = setInterval(fetchStats, 30000)
+        const interval = setInterval(fetchStats, 300000)
         return () => clearInterval(interval)
     }, [fetchStats])
 
