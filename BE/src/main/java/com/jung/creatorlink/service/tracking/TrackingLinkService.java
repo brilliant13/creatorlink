@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Random;
 
 @Service
@@ -34,7 +35,7 @@ public class TrackingLinkService {
                 .orElseThrow(() -> new IllegalArgumentException("캠패인을 찾을 수 없습니다."));
 
         Creator creator = creatorRepository.findById(request.getCreatorId())
-                .orElseThrow(()-> new IllegalArgumentException("크리에이터를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("크리에이터를 찾을 수 없습니다."));
 
         //(선택) 캠페인/크리에이터의 advertiser가 같은지 검증해도 된다.
 
@@ -89,12 +90,29 @@ public class TrackingLinkService {
         return trackingLink.getFinalUrl();
     }
 
+    // 캠페인별 트래킹 링크 목록 조회
+    public List<TrackingLinkResponse> getTrackingLinksByCampaign(Long campaignId) {
+        List<TrackingLink> links = trackingLinkRepository.findAllByCampaignId(campaignId);
+
+        return links.stream()
+                .map(link -> TrackingLinkResponse.builder()
+                        .id(link.getId())
+                        .campaignId(link.getCampaign().getId())
+                        .creatorId(link.getCreator().getId())
+                        .slug(link.getSlug())
+                        .finalUrl(link.getFinalUrl())
+                        .build()
+                )
+                .toList();
+    }
+
+
     //slug 생성기 (간단 버전)
     private String generateUniqueSlug() {
         String slug;
         do {
             slug = randomAlphaNumeric(8);
-        }while (trackingLinkRepository.existsBySlug(slug));
+        } while (trackingLinkRepository.existsBySlug(slug));
         return slug;
     }
 
