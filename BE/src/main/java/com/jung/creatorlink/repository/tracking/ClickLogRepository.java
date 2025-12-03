@@ -12,32 +12,36 @@ import java.util.List;
 public interface ClickLogRepository extends JpaRepository<ClickLog, Long> {
 
     @Query("""
-            select new com.jung.creatorlink.dto.stats.CreatorStatsResponse(
-                c.id,
-                c.name,
-                count(cl.id)
-            )
-            from ClickLog cl
-                join cl.trackingLink tl
-                join tl.creator c
-            where c.advertiser.id = :advertiserId
-            group by c.id, c.name
-            order by count(cl.id) desc 
-            """)
+        select new com.jung.creatorlink.dto.stats.CreatorStatsResponse(
+            c.id,
+            c.name,
+            count(cl.id)
+        )
+        from Creator c
+            left join TrackingLink tl
+                on tl.creator = c
+            left join ClickLog cl
+                on cl.trackingLink = tl
+        where c.advertiser.id = :advertiserId
+        group by c.id, c.name
+        order by count(cl.id) desc
+        """)
     List<CreatorStatsResponse> findCreatorStatsByAdvertiserId(@Param("advertiserId") Long advertiserId);
 
     @Query("""
-            select new com.jung.creatorlink.dto.stats.CampaignStatsResponse(
-                camp.id,
-                camp.name,
-                count(cl.id)
-            )
-            from ClickLog cl
-                join cl.trackingLink tl
-                join tl.campaign camp
-            where camp.advertiser.id = :advertiserId
-            group by camp.id, camp.name
-            order by count(cl.id) desc
-            """)
+        select new com.jung.creatorlink.dto.stats.CampaignStatsResponse(
+            camp.id,
+            camp.name,
+            count(cl.id)
+        )
+        from Campaign camp
+            left join TrackingLink tl
+                on tl.campaign = camp
+            left join ClickLog cl
+                on cl.trackingLink = tl
+        where camp.advertiser.id = :advertiserId
+        group by camp.id, camp.name
+        order by count(cl.id) desc
+        """)
     List<CampaignStatsResponse> findCampaignStatsByAdvertiserId(@Param("advertiserId") Long advertiserId);
 }
