@@ -113,12 +113,30 @@ public class CreatorService {
 
     //soft delete
     @Transactional
+//    public void deleteCreator(Long id, Long advertiserId) {
+//        Creator creator = creatorRepository.findById(id)
+//                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 크리에이터입니다."));
+//
+//        if (!creator.getAdvertiser().getId().equals(advertiserId)) {
+//            throw new IllegalArgumentException("이 크리에이터를 삭제할 권한이 없습니다.");
+//        }
+//
+//        creator.deactivate();
+//    }
     public void deleteCreator(Long id, Long advertiserId) {
         Creator creator = creatorRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 크리에이터입니다."));
 
         if (!creator.getAdvertiser().getId().equals(advertiserId)) {
             throw new IllegalArgumentException("이 크리에이터를 삭제할 권한이 없습니다.");
+        }
+
+        // 정책 핵심: 이 크리에이터에 ACTIVE 링크가 하나라도 있으면 삭제 불가
+        if (trackingLinkRepository.existsByCreator_IdAndStatus(id, Status.ACTIVE)) {
+            throw new IllegalStateException(
+                    "이 크리에이터에 활성 트래킹 링크가 있어 삭제할 수 없습니다. " +
+                            "먼저 관련 트래킹 링크를 비활성화(삭제) 해주세요."
+            );
         }
 
         creator.deactivate();

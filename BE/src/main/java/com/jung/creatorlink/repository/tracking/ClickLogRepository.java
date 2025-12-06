@@ -51,3 +51,5 @@ public interface ClickLogRepository extends JpaRepository<ClickLog, Long> {
     List<CampaignStatsResponse> findCampaignStatsByAdvertiserId(@Param("advertiserId") Long advertiserId);
 }
 
+
+

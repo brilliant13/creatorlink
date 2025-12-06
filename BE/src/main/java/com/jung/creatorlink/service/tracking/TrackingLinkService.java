@@ -1,6 +1,7 @@
 package com.jung.creatorlink.service.tracking;
 
 import com.jung.creatorlink.domain.campaign.Campaign;
+import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.creator.Creator;
 import com.jung.creatorlink.domain.tracking.ClickLog;
 import com.jung.creatorlink.domain.tracking.TrackingLink;
@@ -54,6 +55,7 @@ public class TrackingLinkService {
                 .slug(slug)
                 .finalUrl(finalUrl)
                 .createdAt(LocalDateTime.now())
+                .status(Status.ACTIVE)//이거 추가
                 .build();
 
         TrackingLink saved = trackingLinkRepository.save(trackingLink);
@@ -69,17 +71,45 @@ public class TrackingLinkService {
 
 
     //2) 클릭 처리 + 로그 기록 + 최종 URL 반환
+//    public String handleClick(String slug, HttpServletRequest request) {
+//
+//        TrackingLink trackingLink = trackingLinkRepository.findBySlug(slug)
+//                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 링크입니다."));
+//
+//        if (!trackingLink.isActive()) {
+//            // 비활성 링크 처리: 404 던지거나, "만료된 링크" 페이지로 redirect
+//            throw new IllegalStateException("비활성화된 링크입니다.");
+//        }
+//
+//        //클릭 로그 저장 ( 동기 버전)
+//        ClickLog log = ClickLog.builder()
+//                .trackingLink(trackingLink)
+//                .clickedAt(LocalDateTime.now())
+//                .ip(extractClientIp(request))
+//                .userAgent(request.getHeader("User-Agent"))
+//                .referer(request.getHeader("Referer"))
+//                .build();
+//
+//        clickLogRepository.save(log);
+//
+//        // 나중에는 여기에서 큐로 넣고 비동기로 저장하는 버전도 실험 가능하다.
+//
+//        return trackingLink.getFinalUrl();
+//    }
     public String handleClick(String slug, HttpServletRequest request) {
 
-        TrackingLink trackingLink = trackingLinkRepository.findBySlug(slug)
+        //  기존: findBySlug(...)
+        // TrackingLink trackingLink = trackingLinkRepository.findBySlug(slug)
+        //        .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 링크입니다."));
+
+        //  변경: ACTIVE 인 slug 만 허용
+        TrackingLink trackingLink = trackingLinkRepository
+                .findBySlugAndStatus(slug, Status.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 링크입니다."));
 
-        if (!trackingLink.isActive()) {
-            // 비활성 링크 처리: 404 던지거나, "만료된 링크" 페이지로 redirect
-            throw new IllegalStateException("비활성화된 링크입니다.");
-        }
+        // 여기까지 왔다는 건 이미 ACTIVE 라는 뜻이라 isActive() 체크는 사실 필요 없음
+        // 그래도 방어적으로 남기고 싶으면 유지해도 되고, 안 써도 됨.
 
-        //클릭 로그 저장 ( 동기 버전)
         ClickLog log = ClickLog.builder()
                 .trackingLink(trackingLink)
                 .clickedAt(LocalDateTime.now())
@@ -90,14 +120,33 @@ public class TrackingLinkService {
 
         clickLogRepository.save(log);
 
-        // 나중에는 여기에서 큐로 넣고 비동기로 저장하는 버전도 실험 가능하다.
-
         return trackingLink.getFinalUrl();
     }
 
     // 캠페인별 트래킹 링크 목록 조회
+//    public List<TrackingLinkResponse> getTrackingLinksByCampaign(Long campaignId) {
+//        List<TrackingLink> links = trackingLinkRepository.findAllByCampaignId(campaignId);
+//
+//        return links.stream()
+//                .map(link -> TrackingLinkResponse.builder()
+//                        .id(link.getId())
+//                        .campaignId(link.getCampaign().getId())
+//                        .creatorId(link.getCreator().getId())
+//                        .slug(link.getSlug())
+//                        .finalUrl(link.getFinalUrl())
+//                        .build()
+//                )
+//                .toList();
+//    }
+    // 캠페인별 트래킹 링크 목록 조회
     public List<TrackingLinkResponse> getTrackingLinksByCampaign(Long campaignId) {
-        List<TrackingLink> links = trackingLinkRepository.findAllByCampaignId(campaignId);
+
+        //  기존
+        // List<TrackingLink> links = trackingLinkRepository.findAllByCampaignId(campaignId);
+
+        //  변경: ACTIVE 인 링크만 대시보드에 보여주기
+        List<TrackingLink> links =
+                trackingLinkRepository.findAllByCampaign_IdAndStatus(campaignId, Status.ACTIVE);
 
         return links.stream()
                 .map(link -> TrackingLinkResponse.builder()

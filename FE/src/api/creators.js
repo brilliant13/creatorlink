@@ -8,3 +8,9 @@ export const getCreator = (id, advertiserId) =>
 
 export const createCreator = (data) =>
     client.post('/creators', data)
+
+export const updateCreator = (id, data) =>
+    client.put(`/creators/${id}`, data)
+
+export const deleteCreator = (id, advertiserId) =>
+    client.delete(`/creators/${id}`, { params: { advertiserId } })

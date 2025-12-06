@@ -122,6 +122,17 @@ public class CampaignService {
 
     //soft delete
     @Transactional
+//    public void deleteCampaign(Long id, Long advertiserId) {
+//        Campaign campaign = campaignRepository.findById(id)
+//                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 캠페인입니다."));
+//
+//        if (!campaign.getAdvertiser().getId().equals(advertiserId)) {
+//            throw new IllegalArgumentException("이 캠페인을 삭제할 권한이 없습니다.");
+//        }
+//
+//        //  실제 삭제가 아니라 상태만 변경
+//        campaign.deactivate();
+//    }
     public void deleteCampaign(Long id, Long advertiserId) {
         Campaign campaign = campaignRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 캠페인입니다."));
@@ -130,7 +141,15 @@ public class CampaignService {
             throw new IllegalArgumentException("이 캠페인을 삭제할 권한이 없습니다.");
         }
 
-        //  실제 삭제가 아니라 상태만 변경
+        // 정책 핵심: 이 캠페인에 ACTIVE 링크가 하나라도 있으면 삭제 불가
+        if (trackingLinkRepository.existsByCampaign_IdAndStatus(id, Status.ACTIVE)) {
+            throw new IllegalStateException(
+                    "이 캠페인에 활성 트래킹 링크가 있어 삭제할 수 없습니다. " +
+                            "먼저 관련 트래킹 링크를 비활성화(삭제) 해주세요."
+            );
+        }
+
+        // 실제 삭제 대신 soft delete
         campaign.deactivate();
     }
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getCampaign, updateCampaign, deleteCampaign } from '../api/campaigns'
-import { getTrackingLinks, createTrackingLink } from '../api/trackingLinks'
+import { getTrackingLinks, createTrackingLink, deleteTrackingLink } from '../api/trackingLinks'
 import { getCreators } from '../api/creators'
 
 export default function CampaignDetailPage() {
@@ -60,6 +60,18 @@ export default function CampaignDetailPage() {
             console.error('Failed to create tracking link:', err)
         } finally {
             setSubmitting(false)
+        }
+    }
+
+    const handleDeleteLink = async (linkId, creatorName) => {
+        if (!confirm(`"${creatorName}" 크리에이터의 트래킹 링크를 삭제하시겠습니까?`)) return
+
+        try {
+            await deleteTrackingLink(linkId)
+            fetchData()
+        } catch (err) {
+            console.error('Failed to delete tracking link:', err)
+            alert('삭제에 실패했습니다.')
         }
     }
 
@@ -250,18 +262,25 @@ export default function CampaignDetailPage() {
                         <tbody className="divide-y divide-gray-200">
                         {links.map((link) => {
                             const creator = creators.find((c) => c.id === link.creatorId)
+                            const creatorName = creator?.name || `ID: ${link.creatorId}`
                             return (
                                 <tr key={link.id}>
-                                    <td className="px-4 py-3">{creator?.name || `ID: ${link.creatorId}`}</td>
+                                    <td className="px-4 py-3">{creatorName}</td>
                                     <td className="px-4 py-3 text-sm font-mono text-gray-600">
                                         /t/{link.slug}
                                     </td>
                                     <td className="px-4 py-3">
                                         <button
                                             onClick={() => copyToClipboard(link.slug)}
-                                            className="text-blue-600 hover:underline text-sm"
+                                            className="text-blue-600 hover:underline text-sm mr-3"
                                         >
                                             복사
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteLink(link.id, creatorName)}
+                                            className="text-red-600 hover:underline text-sm"
+                                        >
+                                            삭제
                                         </button>
                                     </td>
                                 </tr>

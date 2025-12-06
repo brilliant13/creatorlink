@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getCreators, createCreator } from '../api/creators'
+import { getCreators, createCreator, updateCreator, deleteCreator } from '../api/creators'
 
 export default function CreatorsPage() {
     const { user } = useAuth()
     const [creators, setCreators] = useState([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
+    const [editingCreator, setEditingCreator] = useState(null)
     const [form, setForm] = useState({ name: '', channelName: '', channelUrl: '', note: '' })
     const [submitting, setSubmitting] = useState(false)
 
@@ -25,16 +26,48 @@ export default function CreatorsPage() {
         fetchCreators()
     }, [user.id])
 
+    const resetForm = () => {
+        setForm({ name: '', channelName: '', channelUrl: '', note: '' })
+        setEditingCreator(null)
+        setShowForm(false)
+    }
+
+    const handleEdit = (creator) => {
+        setEditingCreator(creator)
+        setForm({
+            name: creator.name,
+            channelName: creator.channelName,
+            channelUrl: creator.channelUrl,
+            note: creator.note || '',
+        })
+        setShowForm(true)
+    }
+
+    const handleDelete = async (creator) => {
+        if (!confirm(`"${creator.name}" 크리에이터를 삭제하시겠습니까?`)) return
+
+        try {
+            await deleteCreator(creator.id, user.id)
+            fetchCreators()
+        } catch (err) {
+            console.error('Failed to delete creator:', err)
+            alert('삭제에 실패했습니다.')
+        }
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setSubmitting(true)
         try {
-            await createCreator({ ...form, advertiserId: user.id })
-            setForm({ name: '', channelName: '', channelUrl: '', note: '' })
-            setShowForm(false)
+            if (editingCreator) {
+                await updateCreator(editingCreator.id, { ...form, advertiserId: user.id })
+            } else {
+                await createCreator({ ...form, advertiserId: user.id })
+            }
+            resetForm()
             fetchCreators()
         } catch (err) {
-            console.error('Failed to create creator:', err)
+            console.error('Failed to save creator:', err)
         } finally {
             setSubmitting(false)
         }
@@ -49,7 +82,13 @@ export default function CreatorsPage() {
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold">크리에이터</h1>
                 <button
-                    onClick={() => setShowForm(!showForm)}
+                    onClick={() => {
+                        if (showForm) {
+                            resetForm()
+                        } else {
+                            setShowForm(true)
+                        }
+                    }}
                     className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                     {showForm ? '취소' : '새 크리에이터'}
@@ -58,6 +97,9 @@ export default function CreatorsPage() {
 
             {showForm && (
                 <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
+                    <h2 className="text-lg font-semibold">
+                        {editingCreator ? '크리에이터 수정' : '새 크리에이터 등록'}
+                    </h2>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">이름 *</label>
                         <input
@@ -103,7 +145,7 @@ export default function CreatorsPage() {
                         disabled={submitting}
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                     >
-                        {submitting ? '생성 중...' : '크리에이터 등록'}
+                        {submitting ? '저장 중...' : (editingCreator ? '수정' : '등록')}
                     </button>
                 </form>
             )}
@@ -121,6 +163,7 @@ export default function CreatorsPage() {
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">채널명</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">채널 URL</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">메모</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">액션</th>
                         </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -134,6 +177,20 @@ export default function CreatorsPage() {
                                     </a>
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">{c.note || '-'}</td>
+                                <td className="px-4 py-3">
+                                    <button
+                                        onClick={() => handleEdit(c)}
+                                        className="text-blue-600 hover:underline text-sm mr-3"
+                                    >
+                                        수정
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(c)}
+                                        className="text-red-600 hover:underline text-sm"
+                                    >
+                                        삭제
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                         </tbody>
