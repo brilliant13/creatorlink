@@ -46,6 +46,7 @@ public class CampaignService {
                 .endDate((request.getEndDate()))
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
+                .status(Status.ACTIVE)   // ★ 추가
                 .build();
 
         //3. 저장

@@ -8,3 +8,9 @@ export const getCampaign = (id, advertiserId) =>
 
 export const createCampaign = (data) =>
     client.post('/campaigns', data)
+
+export const updateCampaign = (id, data) =>
+    client.put(`/campaigns/${id}`, data)
+
+export const deleteCampaign = (id, advertiserId) =>
+    client.delete(`/campaigns/${id}`, { params: { advertiserId } })

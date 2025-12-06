@@ -39,6 +39,7 @@ public class CreatorService {
                 .channelUrl(request.getChannelUrl())
                 .note(request.getNote())
                 .createdAt(LocalDateTime.now())
+                .status(Status.ACTIVE)   // ★ 추가
                 .build();
 
         //3. 저장
