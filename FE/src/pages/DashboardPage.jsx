@@ -1,16 +1,17 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { getCampaignStats, getCreatorStats } from '../api/stats'
-import { getCampaigns } from '../api/campaigns'
-import { getCreators } from '../api/creators'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import {useState, useEffect, useCallback} from 'react'
+import {useAuth} from '../contexts/AuthContext'
+import {getCampaignStats, getCreatorStats, getTodayStats} from '../api/stats'
+import {getCampaigns} from '../api/campaigns'
+import {getCreators} from '../api/creators'
+import {BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell} from 'recharts'
 
 export default function DashboardPage() {
-    const { user } = useAuth()
+    const {user} = useAuth()
     const [campaignStats, setCampaignStats] = useState([])
     const [creatorStats, setCreatorStats] = useState([])
     const [campaigns, setCampaigns] = useState([])
     const [creatorCount, setCreatorCount] = useState(0)
+    const [todayClicks, setTodayClicks] = useState(0)
     const [loading, setLoading] = useState(true)
     const [lastUpdated, setLastUpdated] = useState(null)
 
@@ -27,6 +28,14 @@ export default function DashboardPage() {
             setCampaigns(campaignsRes.data)
             setCreatorCount(creatorsRes.data.length)
             setLastUpdated(new Date())
+
+            // 오늘 클릭은 별도로 호출 (실패해도 다른 데이터에 영향 없음)
+            try {
+                const todayRes = await getTodayStats(user.id)
+                setTodayClicks(todayRes.data.todayClicks)
+            } catch {
+                setTodayClicks(0)
+            }
         } catch (err) {
             console.error('Failed to fetch stats:', err)
         } finally {
@@ -69,23 +78,31 @@ export default function DashboardPage() {
 
     const getStateColor = (state) => {
         switch (state) {
-            case 'RUNNING': return '#22c55e'
-            case 'UPCOMING': return '#eab308'
-            case 'ENDED': return '#9ca3af'
-            default: return '#3b82f6'
+            case 'RUNNING':
+                return '#22c55e'
+            case 'UPCOMING':
+                return '#eab308'
+            case 'ENDED':
+                return '#9ca3af'
+            default:
+                return '#3b82f6'
         }
     }
 
     const getStateLabel = (state) => {
         switch (state) {
-            case 'UPCOMING': return { text: '시작 예정', color: 'bg-yellow-100 text-yellow-800' }
-            case 'RUNNING': return { text: '진행 중', color: 'bg-green-100 text-green-800' }
-            case 'ENDED': return { text: '종료', color: 'bg-gray-100 text-gray-800' }
-            default: return { text: state, color: 'bg-gray-100 text-gray-800' }
+            case 'UPCOMING':
+                return {text: '시작 예정', color: 'bg-yellow-100 text-yellow-800'}
+            case 'RUNNING':
+                return {text: '진행 중', color: 'bg-green-100 text-green-800'}
+            case 'ENDED':
+                return {text: '종료', color: 'bg-gray-100 text-gray-800'}
+            default:
+                return {text: state, color: 'bg-gray-100 text-gray-800'}
         }
     }
 
-    const CustomTooltip = ({ active, payload }) => {
+    const CustomTooltip = ({active, payload}) => {
         if (active && payload && payload.length) {
             const data = payload[0].payload
             return (
@@ -105,8 +122,8 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-3">
                     {lastUpdated && (
                         <span className="text-sm text-gray-500">
-              {lastUpdated.toLocaleTimeString()} 업데이트
-            </span>
+                            {lastUpdated.toLocaleTimeString()} 업데이트
+                        </span>
                     )}
                     <button
                         onClick={fetchStats}
@@ -118,10 +135,19 @@ export default function DashboardPage() {
             </div>
 
             {/* 요약 카드 */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-5 gap-4">
                 <div className="bg-white p-6 rounded-lg shadow">
                     <p className="text-sm text-gray-500">총 클릭 수</p>
                     <p className="text-3xl font-bold text-blue-600">{totalClicks.toLocaleString()}</p>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow">
+                    <p className="text-sm text-gray-500">오늘 클릭</p>
+                    <p className="text-3xl font-bold text-orange-500">{todayClicks.toLocaleString()}</p>
+                    {totalClicks > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">
+                            전체의 {((todayClicks / totalClicks) * 100).toFixed(1)}%
+                        </p>
+                    )}
                 </div>
                 <div className="bg-white p-6 rounded-lg shadow">
                     <p className="text-sm text-gray-500">진행 중 캠페인</p>
@@ -153,28 +179,28 @@ export default function DashboardPage() {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg font-semibold">캠페인별 클릭</h2>
                         <div className="flex gap-2 text-xs">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span> 진행 중
-              </span>
                             <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-yellow-500"></span> 예정
-              </span>
+                                <span className="w-2 h-2 rounded-full bg-green-500"></span> 진행 중
+                            </span>
                             <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-gray-400"></span> 종료
-              </span>
+                                <span className="w-2 h-2 rounded-full bg-yellow-500"></span> 예정
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-gray-400"></span> 종료
+                            </span>
                         </div>
                     </div>
                     {campaignChartData.length === 0 ? (
                         <p className="text-gray-500 text-sm">데이터가 없습니다.</p>
                     ) : (
                         <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={campaignChartData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                                <XAxis type="number" />
-                                <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
-                                <Tooltip content={<CustomTooltip />} />
+                            <BarChart data={campaignChartData} layout="vertical" margin={{left: 20, right: 20}}>
+                                <XAxis type="number"/>
+                                <YAxis type="category" dataKey="name" width={80} tick={{fontSize: 12}}/>
+                                <Tooltip content={<CustomTooltip/>}/>
                                 <Bar dataKey="clicks" radius={[0, 4, 4, 0]}>
                                     {campaignChartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={getStateColor(entry.state)} />
+                                        <Cell key={`cell-${index}`} fill={getStateColor(entry.state)}/>
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -188,13 +214,13 @@ export default function DashboardPage() {
                         <p className="text-gray-500 text-sm">데이터가 없습니다.</p>
                     ) : (
                         <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={creatorChartData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                                <XAxis type="number" />
-                                <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
-                                <Tooltip content={<CustomTooltip />} />
+                            <BarChart data={creatorChartData} layout="vertical" margin={{left: 20, right: 20}}>
+                                <XAxis type="number"/>
+                                <YAxis type="category" dataKey="name" width={80} tick={{fontSize: 12}}/>
+                                <Tooltip content={<CustomTooltip/>}/>
                                 <Bar dataKey="clicks" radius={[0, 4, 4, 0]}>
                                     {creatorChartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.isTop ? '#8b5cf6' : '#3b82f6'} />
+                                        <Cell key={`cell-${index}`} fill={entry.isTop ? '#8b5cf6' : '#3b82f6'}/>
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -216,13 +242,20 @@ export default function DashboardPage() {
                                 const stateLabel = getStateLabel(campaign?.state)
                                 return (
                                     <li key={stat.campaignId} className="flex justify-between items-center">
-                                        <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 text-xs rounded-full ${stateLabel.color}`}>
-                        {stateLabel.text}
-                      </span>
-                                            <span className="truncate max-w-[150px]">{stat.campaignName}</span>
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <span className={`px-2 py-0.5 text-xs rounded-full shrink-0 ${stateLabel.color}`}>
+                                    {stateLabel.text}
+                                </span>
+                                            <span className="truncate">{stat.campaignName}</span>
                                         </div>
-                                        <span className="font-medium">{stat.totalClicks.toLocaleString()}</span>
+                                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                                            {stat.todayClicks > 0 && (
+                                                <span className="text-xs text-orange-500">
+                                        오늘 +{stat.todayClicks}
+                                    </span>
+                                            )}
+                                            <span className="font-medium w-8 text-right">{stat.totalClicks.toLocaleString()}</span>
+                                        </div>
                                     </li>
                                 )
                             })}
@@ -238,17 +271,24 @@ export default function DashboardPage() {
                         <ul className="space-y-3">
                             {creatorStats.map((stat, index) => (
                                 <li key={stat.creatorId} className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
                                         {index === 0 && stat.totalClicks > 0 && (
-                                            <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800">
-                        TOP
-                      </span>
+                                            <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800 shrink-0">
+                                    TOP
+                                </span>
                                         )}
-                                        <span className={index === 0 && stat.totalClicks > 0 ? 'font-medium' : ''}>
-                      {stat.creatorName}
-                    </span>
+                                        <span className={`truncate ${index === 0 && stat.totalClicks > 0 ? 'font-medium' : ''}`}>
+                                {stat.creatorName}
+                            </span>
                                     </div>
-                                    <span className="font-medium">{stat.totalClicks.toLocaleString()}</span>
+                                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                                        {stat.todayClicks > 0 && (
+                                            <span className="text-xs text-orange-500">
+                                    오늘 +{stat.todayClicks}
+                                </span>
+                                        )}
+                                        <span className="font-medium w-8 text-right">{stat.totalClicks.toLocaleString()}</span>
+                                    </div>
                                 </li>
                             ))}
                         </ul>

@@ -5,3 +5,6 @@ export const getCampaignStats = (advertiserId) =>
 
 export const getCreatorStats = (advertiserId) =>
     client.get('/stats/creators', { params: { advertiserId } })
+
+export const getTodayStats = (advertiserId) =>
+    client.get('/stats/today', { params: { advertiserId } })

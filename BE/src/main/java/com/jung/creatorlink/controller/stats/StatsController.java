@@ -2,6 +2,7 @@ package com.jung.creatorlink.controller.stats;
 
 import com.jung.creatorlink.dto.stats.CampaignStatsResponse;
 import com.jung.creatorlink.dto.stats.CreatorStatsResponse;
+import com.jung.creatorlink.dto.stats.TodayStatsResponse;
 import com.jung.creatorlink.service.stats.StatsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,5 +37,11 @@ public class StatsController {
             description = "광고주(advertiserId) 기준으로 캠페인별 총 클릭 수를 조회한다.")
     public List<CampaignStatsResponse> getCampaignStats(@RequestParam Long advertiserId) {
         return statsService.getCampaignStats(advertiserId);
+    }
+
+    @GetMapping("/today")
+    @Operation(summary = "오늘 클릭 통계", description = "광고주(advertiserId) 기준 오늘 발생한 총 클릭 수를 조회한다.")
+    public TodayStatsResponse getTodayStats(@RequestParam Long advertiserId) {
+        return statsService.getTodayStats(advertiserId);
     }
 }
