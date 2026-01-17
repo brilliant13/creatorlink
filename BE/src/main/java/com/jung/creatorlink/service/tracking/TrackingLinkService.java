@@ -32,13 +32,26 @@ public class TrackingLinkService {
 
     //1) 트래킹 링크 생성
     public TrackingLinkResponse createTrackingLink(TrackingLinkCreateRequest request) {
+
         Campaign campaign = campaignRepository.findById(request.getCampaignId())
                 .orElseThrow(() -> new IllegalArgumentException("캠패인을 찾을 수 없습니다."));
 
         Creator creator = creatorRepository.findById(request.getCreatorId())
                 .orElseThrow(() -> new IllegalArgumentException("크리에이터를 찾을 수 없습니다."));
 
-        //(선택) 캠페인/크리에이터의 advertiser가 같은지 검증해도 된다.
+        //  같은 광고주 소유인지 검증
+        if (!campaign.getAdvertiser().getId().equals(creator.getAdvertiser().getId())) {
+            throw new IllegalArgumentException("같은 광고주의 캠페인과 크리에이터만 트래킹 링크로 연결할 수 있습니다.");
+        }
+        // (JWT 붙이기 전이라 request에 advertiserId가 있다면 이 검증도 가능)
+        // if (!campaign.getAdvertiser().getId().equals(request.getAdvertiserId())) {
+        //     throw new IllegalArgumentException("현재 광고주의 캠페인/크리에이터만 링크를 생성할 수 있습니다.");
+        // }
+
+        //(선택) 캠페인/크리에이터의 advertiser(user)가 같은지 검증해도 된다. 아니 검증을 해야하지
+        // (선택) campaign.advertiser와 creator.advertiser가 같은지 검증 가능
+
+
 
         //slug 생성 (중복 체크 포함)
         String slug = generateUniqueSlug();

@@ -46,7 +46,8 @@ public class CreatorService {
         Creator saved = creatorRepository.save(creator);
 
         //4. 응답 DTO로 변환
-        return toResponse(saved);
+//        return toResponse(saved);
+        return CreatorResponse.from(saved);
     }
 
     //광고주별 Creator 목록 조회
@@ -55,7 +56,8 @@ public class CreatorService {
 //        List<Creator> creators = creatorRepository.findAllByAdvertiserId(advertiserId);
         List<Creator> creators = creatorRepository.findAllByAdvertiserIdAndStatus(advertiserId, Status.ACTIVE);
         return creators.stream()
-                .map(this::toResponse)
+//                .map(this::toResponse)
+                .map(CreatorResponse::from)
                 .toList();
     }
 
@@ -69,9 +71,11 @@ public class CreatorService {
         if (!creator.getAdvertiser().getId().equals(advertiserId)) {
             throw new IllegalArgumentException("해당 크리에이터에 접근할 권한이 없습니다.");
         }
-        return toResponse(creator);
+//        return toResponse(creator);
+        return CreatorResponse.from(creator);
     }
 
+    //수정
     @Transactional
     public CreatorResponse updateCreator(Long id, CreatorUpdateRequest request) {
         Creator creator = creatorRepository.findById(id)
@@ -111,9 +115,8 @@ public class CreatorService {
 //        creatorRepository.delete(creator);
 //    }
 
-    //soft delete
-    @Transactional
-//    public void deleteCreator(Long id, Long advertiserId) {
+
+    //    public void deleteCreator(Long id, Long advertiserId) {
 //        Creator creator = creatorRepository.findById(id)
 //                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 크리에이터입니다."));
 //
@@ -123,6 +126,10 @@ public class CreatorService {
 //
 //        creator.deactivate();
 //    }
+
+    //삭제
+    //soft delete
+    @Transactional
     public void deleteCreator(Long id, Long advertiserId) {
         Creator creator = creatorRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 크리에이터입니다."));
@@ -143,16 +150,17 @@ public class CreatorService {
     }
 
 
-    private CreatorResponse toResponse(Creator creator) {
-        return CreatorResponse.builder()
-                .id(creator.getId())
-                .advertiserId(creator.getAdvertiser().getId())
-                .name(creator.getName())
-                .channelName(creator.getChannelName())
-                .channelUrl(creator.getChannelUrl())
-                .note(creator.getNote())
-                .build();
-    }
+//    private CreatorResponse toResponse(Creator creator) {
+//        return CreatorResponse.builder()
+//                .id(creator.getId())
+//                .advertiserId(creator.getAdvertiser().getId())
+//                .name(creator.getName())
+//                .channelName(creator.getChannelName())
+//                .channelUrl(creator.getChannelUrl())
+//                .note(creator.getNote())
+//                .build();
+//        return CreatorResponse.from(creator);
+//    }
     //여기서도 advertiserId는 지금은 인증이 없어서 쿼리/요청으로 받는 임시 방식이야.
     //나중에 JWT 붙이면 “현재 로그인된 User ID”를 뽑아서 쓰는 걸로 바꿀 거고.
 }

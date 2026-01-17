@@ -53,7 +53,8 @@ public class CampaignService {
         Campaign saved = campaignRepository.save(campaign);
 
         //4. 응답 DTO로 변환
-        return toResponse(saved);
+//        return toResponse(saved);
+        return CampaignResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +66,8 @@ public class CampaignService {
         //List<Campaign> -> Stream<Campaign> -> (toResponse 메소드 거치고) -> List<Campaign>
         //스트림객체에서 스트림객체로. 매핑. map()
         return campaigns.stream()
-                .map(this::toResponse)
+//                .map(this::toResponse)
+                .map(CampaignResponse::from)
                 .toList();
     }
 
@@ -77,7 +79,8 @@ public class CampaignService {
         if (!campaign.getAdvertiser().getId().equals(advertiserId)) {
             throw new IllegalArgumentException("해당 광고주의 캠페인이 아닙니다.");
         }
-        return toResponse(campaign);
+//        return toResponse(campaign);
+        return CampaignResponse.from(campaign);
     }
 
     @Transactional
@@ -120,9 +123,8 @@ public class CampaignService {
 //        campaignRepository.delete(campaign);
 //    }
 
-    //soft delete
-    @Transactional
-//    public void deleteCampaign(Long id, Long advertiserId) {
+
+    //    public void deleteCampaign(Long id, Long advertiserId) {
 //        Campaign campaign = campaignRepository.findById(id)
 //                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 캠페인입니다."));
 //
@@ -133,15 +135,19 @@ public class CampaignService {
 //        //  실제 삭제가 아니라 상태만 변경
 //        campaign.deactivate();
 //    }
+
+    //soft delete
+    @Transactional
     public void deleteCampaign(Long id, Long advertiserId) {
         Campaign campaign = campaignRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 캠페인입니다."));
 
+        // 소유권 검증: 다른 광고주의 캠페인은 삭제 불가
         if (!campaign.getAdvertiser().getId().equals(advertiserId)) {
             throw new IllegalArgumentException("이 캠페인을 삭제할 권한이 없습니다.");
         }
 
-        // 정책 핵심: 이 캠페인에 ACTIVE 링크가 하나라도 있으면 삭제 불가
+        // 정책 핵심: 이 캠페인에 ACTIVE 트래킹 링크가 하나라도 있으면 삭제 불가
         if (trackingLinkRepository.existsByCampaign_IdAndStatus(id, Status.ACTIVE)) {
             throw new IllegalStateException(
                     "이 캠페인에 활성 트래킹 링크가 있어 삭제할 수 없습니다. " +
@@ -154,9 +160,8 @@ public class CampaignService {
     }
 
 
-
-    private CampaignResponse toResponse(Campaign campaign) {
-        return CampaignResponse.from(campaign);
+//    private CampaignResponse toResponse(Campaign campaign) {
+//        return CampaignResponse.from(campaign);
 //        return CampaignResponse.builder()
 //                .id(campaign.getId())
 //                .advertiserId(campaign.getAdvertiser().getId())
@@ -166,5 +171,5 @@ public class CampaignService {
 //                .startDate(campaign.getStartDate())
 //                .endDate(campaign.getEndDate())
 //                .build();
-    }
+//    }
 }
