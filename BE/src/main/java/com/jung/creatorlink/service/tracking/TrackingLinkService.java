@@ -1,6 +1,7 @@
 package com.jung.creatorlink.service.tracking;
 
 import com.jung.creatorlink.domain.campaign.Campaign;
+import com.jung.creatorlink.domain.channel.Channel;
 import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.creator.Creator;
 import com.jung.creatorlink.domain.tracking.ClickLog;
@@ -8,6 +9,7 @@ import com.jung.creatorlink.domain.tracking.TrackingLink;
 import com.jung.creatorlink.dto.tracking.TrackingLinkCreateRequest;
 import com.jung.creatorlink.dto.tracking.TrackingLinkResponse;
 import com.jung.creatorlink.repository.campaign.CampaignRepository;
+import com.jung.creatorlink.repository.channel.ChannelRepository;
 import com.jung.creatorlink.repository.creator.CreatorRepository;
 import com.jung.creatorlink.repository.tracking.ClickLogRepository;
 import com.jung.creatorlink.repository.tracking.TrackingLinkRepository;
@@ -29,6 +31,7 @@ public class TrackingLinkService {
     private final ClickLogRepository clickLogRepository;
     private final CampaignRepository campaignRepository;
     private final CreatorRepository creatorRepository;
+    private final ChannelRepository channelRepository;
 
     //1) 트래킹 링크 생성
     public TrackingLinkResponse createTrackingLink(TrackingLinkCreateRequest request) {
@@ -39,19 +42,26 @@ public class TrackingLinkService {
         Creator creator = creatorRepository.findById(request.getCreatorId())
                 .orElseThrow(() -> new IllegalArgumentException("크리에이터를 찾을 수 없습니다."));
 
-        //  같은 광고주 소유인지 검증
-        if (!campaign.getAdvertiser().getId().equals(creator.getAdvertiser().getId())) {
-            throw new IllegalArgumentException("같은 광고주의 캠페인과 크리에이터만 트래킹 링크로 연결할 수 있습니다.");
+        Channel channel = channelRepository.findById(request.getChannelId())
+                .orElseThrow(() -> new IllegalArgumentException("채널을 찾을 수 없습니다."));
+
+
+        //  (권장) 요청 advertiserId를 받는다면 "현재 광고주" 검증까지
+        // JWT 붙기 전이라면 request.getAdvertiserId()를 받는 게 실수 방지에 도움 됨
+        if (request.getAdvertiserId() != null) {
+            Long advId = request.getAdvertiserId();
+            if (!campaign.getAdvertiser().getId().equals(advId)
+                    || !creator.getAdvertiser().getId().equals(advId)
+                    || !channel.getAdvertiser().getId().equals(advId)) {
+                throw new IllegalArgumentException("현재 로그인 된 광고주의 리소스만 사용 가능합니다.");
+            }
         }
-        // (JWT 붙이기 전이라 request에 advertiserId가 있다면 이 검증도 가능)
-        // if (!campaign.getAdvertiser().getId().equals(request.getAdvertiserId())) {
-        //     throw new IllegalArgumentException("현재 광고주의 캠페인/크리에이터만 링크를 생성할 수 있습니다.");
-        // }
-
-        //(선택) 캠페인/크리에이터의 advertiser(user)가 같은지 검증해도 된다. 아니 검증을 해야하지
-        // (선택) campaign.advertiser와 creator.advertiser가 같은지 검증 가능
-
-
+        //  (필수) 세 리소스 소유권이 같은지 검증
+        Long advIdFromCampaign = campaign.getAdvertiser().getId();
+        if (!creator.getAdvertiser().getId().equals(advIdFromCampaign)
+                || !channel.getAdvertiser().getId().equals(advIdFromCampaign)) {
+            throw new IllegalArgumentException("같은 광고주의 캠페인/크리에이터/채널만 트래킹 링크로 연결할 수 있습니다.");
+        }
 
         //slug 생성 (중복 체크 포함)
         String slug = generateUniqueSlug();
@@ -65,6 +75,7 @@ public class TrackingLinkService {
         TrackingLink trackingLink = TrackingLink.builder()
                 .campaign(campaign)
                 .creator(creator)
+                .channel(channel)
                 .slug(slug)
                 .finalUrl(finalUrl)
                 .createdAt(LocalDateTime.now())
@@ -77,38 +88,12 @@ public class TrackingLinkService {
                 .id(saved.getId())
                 .campaignId(saved.getCampaign().getId())
                 .creatorId(saved.getCreator().getId())
+                .channelId(saved.getChannel().getId())
                 .slug(saved.getSlug())
                 .finalUrl(saved.getFinalUrl())
                 .build();
     }
 
-
-    //2) 클릭 처리 + 로그 기록 + 최종 URL 반환
-//    public String handleClick(String slug, HttpServletRequest request) {
-//
-//        TrackingLink trackingLink = trackingLinkRepository.findBySlug(slug)
-//                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 링크입니다."));
-//
-//        if (!trackingLink.isActive()) {
-//            // 비활성 링크 처리: 404 던지거나, "만료된 링크" 페이지로 redirect
-//            throw new IllegalStateException("비활성화된 링크입니다.");
-//        }
-//
-//        //클릭 로그 저장 ( 동기 버전)
-//        ClickLog log = ClickLog.builder()
-//                .trackingLink(trackingLink)
-//                .clickedAt(LocalDateTime.now())
-//                .ip(extractClientIp(request))
-//                .userAgent(request.getHeader("User-Agent"))
-//                .referer(request.getHeader("Referer"))
-//                .build();
-//
-//        clickLogRepository.save(log);
-//
-//        // 나중에는 여기에서 큐로 넣고 비동기로 저장하는 버전도 실험 가능하다.
-//
-//        return trackingLink.getFinalUrl();
-//    }
     public String handleClick(String slug, HttpServletRequest request) {
 
         //  기존: findBySlug(...)
@@ -137,21 +122,6 @@ public class TrackingLinkService {
     }
 
     // 캠페인별 트래킹 링크 목록 조회
-//    public List<TrackingLinkResponse> getTrackingLinksByCampaign(Long campaignId) {
-//        List<TrackingLink> links = trackingLinkRepository.findAllByCampaignId(campaignId);
-//
-//        return links.stream()
-//                .map(link -> TrackingLinkResponse.builder()
-//                        .id(link.getId())
-//                        .campaignId(link.getCampaign().getId())
-//                        .creatorId(link.getCreator().getId())
-//                        .slug(link.getSlug())
-//                        .finalUrl(link.getFinalUrl())
-//                        .build()
-//                )
-//                .toList();
-//    }
-    // 캠페인별 트래킹 링크 목록 조회
     public List<TrackingLinkResponse> getTrackingLinksByCampaign(Long campaignId) {
 
         //  기존
@@ -166,6 +136,7 @@ public class TrackingLinkService {
                         .id(link.getId())
                         .campaignId(link.getCampaign().getId())
                         .creatorId(link.getCreator().getId())
+                        .channelId(link.getChannel().getId())
                         .slug(link.getSlug())
                         .finalUrl(link.getFinalUrl())
                         .build()
@@ -201,14 +172,6 @@ public class TrackingLinkService {
         }
         return ip;
     }
-
-//    @Transactional
-//    public void deleteTrackingLink(Long id) {
-//        TrackingLink link = trackingLinkRepository.findById(id)
-//                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 트래킹 링크입니다."));
-//
-//        trackingLinkRepository.delete(link);
-//    }
 
     //soft delete
     @Transactional

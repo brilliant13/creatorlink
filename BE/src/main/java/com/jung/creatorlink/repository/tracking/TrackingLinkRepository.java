@@ -38,4 +38,8 @@ public interface TrackingLinkRepository extends JpaRepository<TrackingLink, Long
     // 이 크리에이터에 ACTIVE 링크가 하나라도 남아 있는지?
     boolean existsByCreator_IdAndStatus(Long creatorId, Status status);
 
+    boolean existsByCampaign_IdAndCreator_IdAndChannel_IdAndStatus(
+            Long campaignId, Long creatorId, Long channelId, Status status
+    );
+
 }

@@ -12,6 +12,8 @@ public class TrackingLinkResponse {
     private Long id;
     private Long campaignId;
     private Long creatorId;
+    private Long channelId;
+    private String channelDisplay; // "Instagram / Story" 같은 표시용 (선택)
     private String slug;
     private String finalUrl;
 }

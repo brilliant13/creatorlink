@@ -13,8 +13,9 @@ import java.time.LocalDateTime;
 @Table(
         name = "click_logs",
         indexes = {
-                @Index(name = "idx_click_logs_tracking_link_id", columnList = "tracking_link_id"),
-                @Index(name = "idx_click_logs_clicked_at", columnList = "clicked_at")
+                @Index(name = "idx_click_logs_link_clicked_at", columnList = "tracking_link_id, clicked_at")
+                // (선택) 전역 기간 필터/아카이빙이 많고 EXPLAIN으로 이득이 확인되면 추가
+                // @Index(name = "idx_click_logs_clicked_at", columnList = "clicked_at")
         }
 )
 @Getter

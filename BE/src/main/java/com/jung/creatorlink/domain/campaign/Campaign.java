@@ -9,7 +9,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "campaigns")
+@Table(
+        name = "campaigns",
+        indexes = {
+                @Index(name = "idx_campaigns_adv_status", columnList = "advertiser_id, status")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
