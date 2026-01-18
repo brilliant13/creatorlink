@@ -1,6 +1,7 @@
 package com.jung.creatorlink.controller.channel;
 
 import com.jung.creatorlink.dto.channel.ChannelCreateRequest;
+import com.jung.creatorlink.dto.channel.ChannelPatchRequest;
 import com.jung.creatorlink.dto.channel.ChannelResponse;
 import com.jung.creatorlink.dto.channel.ChannelUpdateRequest;
 import com.jung.creatorlink.service.channel.ChannelService;
@@ -12,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/channels")
@@ -48,13 +48,24 @@ public class ChannelController {
 
     // 채널 수정
     @PutMapping("/{id}")
-    @Operation(summary = "채널 수정", description = "채널 기본 정보(platform, placement, note)를 수정한다.")
+    @Operation(summary = "채널 수정", description = "채널 기본 정보(platform, placement, note, displayName, iconUrl)를 수정한다.")
     public ChannelResponse updateChannel(
             @PathVariable Long id,
             @Valid @RequestBody ChannelUpdateRequest request
     ) {
         return channelService.updateChannel(id, request);
     }
+
+    // 채널 부분 수정
+    @PatchMapping("/{id}")
+    @Operation(summary = "채널 부분 수정", description = "요청에 포함된 필드만 수정한다.")
+    public ChannelResponse patchChannel(
+            @PathVariable Long id,
+            @Valid @RequestBody ChannelPatchRequest request
+    ) {
+        return channelService.patchChannel(id, request);
+    }
+
 
     // 채널 삭제 (Soft delete)
     @DeleteMapping("/{id}")

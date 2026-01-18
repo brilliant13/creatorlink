@@ -22,7 +22,7 @@ public class ChannelCreateRequest {
 
     private String note;         // optional
 
-    private String displayName; // 추가(비워도 되게 하고 서버가 기본값 생성 가능)
-    private String iconUrl;     // 추가(선택)
+    private String displayName; //optional
+    private String iconUrl;     //업로드 API에서 받은 URL
 
 }

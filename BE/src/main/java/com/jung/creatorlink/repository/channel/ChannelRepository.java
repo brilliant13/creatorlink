@@ -6,6 +6,7 @@ import com.jung.creatorlink.domain.common.Status;
 
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ChannelRepository extends JpaRepository<Channel, Long> {
 
@@ -16,4 +17,9 @@ public interface ChannelRepository extends JpaRepository<Channel, Long> {
     boolean existsByAdvertiser_IdAndPlatformAndPlacementAndIdNot(
             Long advertiserId, String platform, String placement, Long id
     );
+    boolean existsByAdvertiser_IdAndPlatformAndPlacementAndStatusAndIdNot(
+            Long advertiserId, String platform, String placement, Status status, Long id
+    );
+    Optional<Channel> findByAdvertiser_IdAndPlatformAndPlacement(Long advertiserId, String platform, String placement);
+
 }

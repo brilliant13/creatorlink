@@ -73,6 +73,14 @@ public class Channel {
         return this.status == Status.ACTIVE;
     }
 
+    public void restore(String displayName, String iconUrl, String note) {
+        this.status = Status.ACTIVE;
+        this.displayName = displayName;
+        this.iconUrl = iconUrl;
+        this.note = note;
+        this.updatedAt = LocalDateTime.now();
+    }
+
 //    public void update(String platform, String placement, String note) {
 //        this.platform = platform;
 //        this.placement = placement;
@@ -87,8 +95,10 @@ public class Channel {
                 ? defaultDisplayName(platform, placement)
                 : displayName;
 
-        this.iconUrl = iconUrl;
-        this.note = note;
+        if (iconUrl != null) this.iconUrl = iconUrl; // null이면 유지
+        if (note != null) this.note = note;         // null이면 유지
+//        this.iconUrl = iconUrl;
+//        this.note = note;
         this.updatedAt = LocalDateTime.now();
     }
     public static String defaultDisplayName(String platform, String placement) {

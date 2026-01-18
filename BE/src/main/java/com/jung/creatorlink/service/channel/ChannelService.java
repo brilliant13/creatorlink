@@ -5,6 +5,7 @@ import com.jung.creatorlink.domain.channel.Channel;
 import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.user.User;
 import com.jung.creatorlink.dto.channel.ChannelCreateRequest;
+import com.jung.creatorlink.dto.channel.ChannelPatchRequest;
 import com.jung.creatorlink.dto.channel.ChannelResponse;
 import com.jung.creatorlink.dto.channel.ChannelUpdateRequest;
 import com.jung.creatorlink.repository.channel.ChannelRepository;
@@ -36,9 +37,28 @@ public class ChannelService {
             throw new IllegalArgumentException("이미 같은 채널(플랫폼+노출위치)이 존재합니다.");
         }
 
+        Channel existing = channelRepository
+                .findByAdvertiser_IdAndPlatformAndPlacement(
+                        request.getAdvertiserId(),
+                        request.getPlatform(),
+                        request.getPlacement()
+                )
+                .orElse(null);
+
         String displayName = (request.getDisplayName() == null || request.getDisplayName().isBlank())
                 ? Channel.defaultDisplayName(request.getPlatform(), request.getPlacement())
                 : request.getDisplayName();
+
+        // 이미 같은 조합이 존재하면
+        if (existing != null) {
+            if (existing.isActive()) {
+                throw new IllegalArgumentException("이미 같은 채널(플랫폼+노출위치)이 존재합니다.");
+            }
+
+            // INACTIVE면 restore로 재활성화
+            existing.restore(displayName, request.getIconUrl(), request.getNote());
+            return ChannelResponse.from(existing); // 트랜잭션이면 save 없어도 dirty checking으로 반영됨
+        }
 
         // 3) Channel 생성
         Channel channel = Channel.builder()
@@ -105,15 +125,27 @@ public class ChannelService {
         }
 
         // 같은 광고주 내 platform+placement 중복 방지 (자기 자신 제외)
-        boolean exists = channelRepository.existsByAdvertiser_IdAndPlatformAndPlacementAndIdNot(
+//        boolean exists = channelRepository.existsByAdvertiser_IdAndPlatformAndPlacementAndIdNot(
+//                request.getAdvertiserId(),
+//                request.getPlatform(),
+//                request.getPlacement(),
+//                channelId
+//        );
+//        if (exists) {
+//            throw new IllegalArgumentException("이미 같은 채널(플랫폼+노출위치)이 존재합니다.");
+//        }
+
+        //동일 조합으로 바꾸려는데
+        // status = ACTIVE만 중복으로 막기 (자기 자신 제외)
+        boolean exists = channelRepository.existsByAdvertiser_IdAndPlatformAndPlacementAndStatusAndIdNot(
                 request.getAdvertiserId(),
                 request.getPlatform(),
                 request.getPlacement(),
+                Status.ACTIVE,
                 channelId
         );
-        if (exists) {
-            throw new IllegalArgumentException("이미 같은 채널(플랫폼+노출위치)이 존재합니다.");
-        }
+        if (exists) throw new IllegalArgumentException("이미 같은 채널(플랫폼+노출위치)이 존재합니다.");
+
 
         // 엔티티 헬퍼 메서드로 수정
 //        channel.update(request.getPlatform(), request.getPlacement(), request.getNote());
@@ -131,6 +163,69 @@ public class ChannelService {
 
         return ChannelResponse.from(channel);
     }
+
+    // 채널 부분 수정 (Patch)
+    @Transactional
+    public ChannelResponse patchChannel(Long channelId, ChannelPatchRequest req) {
+
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("채널을 찾을 수 없습니다."));
+
+        if (!channel.getAdvertiser().getId().equals(req.getAdvertiserId())) {
+            throw new IllegalArgumentException("이 채널을 수정할 권한이 없습니다.");
+        }
+        if (!channel.isActive()) {
+            throw new IllegalArgumentException("삭제된 채널은 수정할 수 없습니다.");
+        }
+
+        boolean platformProvided = req.getPlatform() != null && !req.getPlatform().isBlank();
+        boolean placementProvided = req.getPlacement() != null && !req.getPlacement().isBlank();
+
+        // ✅ 조합 키 수정은 둘 다 와야 안전
+        if (platformProvided ^ placementProvided) {
+            throw new IllegalArgumentException("platform/placement는 함께 수정해야 합니다.");
+        }
+
+        String newPlatform  = platformProvided ? req.getPlatform()  : channel.getPlatform();
+        String newPlacement = placementProvided ? req.getPlacement() : channel.getPlacement();
+
+        boolean keyChanged = platformProvided && (
+                !newPlatform.equals(channel.getPlatform()) || !newPlacement.equals(channel.getPlacement())
+        );
+
+        // ✅ 조합이 바뀌는 경우에만 ACTIVE 중복 검사
+        if (keyChanged) {
+            boolean exists = channelRepository.existsByAdvertiser_IdAndPlatformAndPlacementAndStatusAndIdNot(
+                    req.getAdvertiserId(),
+                    newPlatform,
+                    newPlacement,
+                    Status.ACTIVE,
+                    channelId
+            );
+            if (exists) throw new IllegalArgumentException("이미 같은 채널(플랫폼+노출위치)이 존재합니다.");
+        }
+
+        // displayName 규칙:
+        // - displayName이 명시되면 그걸 사용
+        // - platform/placement가 바뀌었는데 displayName이 없으면 기본값 재계산
+        // - 아니면 기존 유지
+        String newDisplayName;
+        if (req.getDisplayName() != null && !req.getDisplayName().isBlank()) {
+            newDisplayName = req.getDisplayName();
+        } else if (keyChanged) {
+            newDisplayName = Channel.defaultDisplayName(newPlatform, newPlacement);
+        } else {
+            newDisplayName = channel.getDisplayName();
+        }
+
+        String newIconUrl = (req.getIconUrl() != null) ? req.getIconUrl() : channel.getIconUrl();
+        String newNote    = (req.getNote() != null) ? req.getNote() : channel.getNote();
+
+        channel.update(newPlatform, newPlacement, newDisplayName, newIconUrl, newNote);
+
+        return ChannelResponse.from(channel);
+    }
+
 
     // 채널 삭제 (Soft delete)
     @Transactional

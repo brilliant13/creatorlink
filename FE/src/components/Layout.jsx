@@ -17,6 +17,7 @@ export default function Layout() {
                     <NavLink to="/dashboard" className={linkClass}>대시보드</NavLink>
                     <NavLink to="/campaigns" className={linkClass}>캠페인</NavLink>
                     <NavLink to="/creators" className={linkClass}>크리에이터</NavLink>
+                    <NavLink to="/channels" className={linkClass}>채널</NavLink>
                 </nav>
                 <div className="p-4 border-t border-gray-200">
                     <p className="text-sm text-gray-600 mb-2">{user?.name}</p>

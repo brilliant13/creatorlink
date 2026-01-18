@@ -1,33 +1,38 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { getCampaign, updateCampaign, deleteCampaign } from '../api/campaigns'
-import { getTrackingLinks, createTrackingLink, deleteTrackingLink } from '../api/trackingLinks'
-import { getCreators } from '../api/creators'
+import {useState, useEffect} from 'react'
+import {useParams, useNavigate} from 'react-router-dom'
+import {useAuth} from '../contexts/AuthContext'
+import {getCampaign, updateCampaign, deleteCampaign} from '../api/campaigns'
+import {getTrackingLinks, createTrackingLink, deleteTrackingLink} from '../api/trackingLinks'
+import {getCreators} from '../api/creators'
+import {getChannels} from '../api/channels'
 
 export default function CampaignDetailPage() {
-    const { id } = useParams()
+    const {id} = useParams()
     const navigate = useNavigate()
-    const { user } = useAuth()
+    const {user} = useAuth()
     const [campaign, setCampaign] = useState(null)
     const [links, setLinks] = useState([])
     const [creators, setCreators] = useState([])
+    const [channels, setChannels] = useState([])
     const [loading, setLoading] = useState(true)
     const [selectedCreator, setSelectedCreator] = useState('')
+    const [selectedChannel, setSelectedChannel] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [editing, setEditing] = useState(false)
-    const [form, setForm] = useState({ name: '', description: '', landingUrl: '', startDate: '', endDate: '' })
+    const [form, setForm] = useState({name: '', description: '', landingUrl: '', startDate: '', endDate: ''})
 
     const fetchData = async () => {
         try {
-            const [campaignRes, linksRes, creatorsRes] = await Promise.all([
+            const [campaignRes, linksRes, creatorsRes, channelsRes] = await Promise.all([
                 getCampaign(id, user.id),
                 getTrackingLinks(id),
                 getCreators(user.id),
+                getChannels(user.id),
             ])
             setCampaign(campaignRes.data)
             setLinks(linksRes.data)
             setCreators(creatorsRes.data)
+            setChannels(channelsRes.data)
             setForm({
                 name: campaignRes.data.name,
                 description: campaignRes.data.description || '',
@@ -47,14 +52,17 @@ export default function CampaignDetailPage() {
     }, [id, user.id])
 
     const handleCreateLink = async () => {
-        if (!selectedCreator) return
+        if (!selectedCreator || !selectedChannel) return
         setSubmitting(true)
         try {
             await createTrackingLink({
                 campaignId: Number(id),
                 creatorId: Number(selectedCreator),
+                channelId: Number(selectedChannel),
+                advertiserId: user.id,
             })
             setSelectedCreator('')
+            setSelectedChannel('')
             fetchData()
         } catch (err) {
             console.error('Failed to create tracking link:', err)
@@ -79,7 +87,7 @@ export default function CampaignDetailPage() {
         e.preventDefault()
         setSubmitting(true)
         try {
-            await updateCampaign(id, { ...form, advertiserId: user.id })
+            await updateCampaign(id, {...form, advertiserId: user.id})
             setEditing(false)
             fetchData()
         } catch (err) {
@@ -107,10 +115,14 @@ export default function CampaignDetailPage() {
 
     const getStateLabel = (state) => {
         switch (state) {
-            case 'UPCOMING': return { text: '시작 예정', color: 'bg-yellow-100 text-yellow-800' }
-            case 'RUNNING': return { text: '진행 중', color: 'bg-green-100 text-green-800' }
-            case 'ENDED': return { text: '종료', color: 'bg-gray-100 text-gray-800' }
-            default: return { text: state, color: 'bg-gray-100 text-gray-800' }
+            case 'UPCOMING':
+                return {text: '시작 예정', color: 'bg-yellow-100 text-yellow-800'}
+            case 'RUNNING':
+                return {text: '진행 중', color: 'bg-green-100 text-green-800'}
+            case 'ENDED':
+                return {text: '종료', color: 'bg-gray-100 text-gray-800'}
+            default:
+                return {text: state, color: 'bg-gray-100 text-gray-800'}
         }
     }
 
@@ -122,8 +134,6 @@ export default function CampaignDetailPage() {
         return <div className="text-gray-500">캠페인을 찾을 수 없습니다.</div>
     }
 
-    const linkedCreatorIds = links.map((l) => l.creatorId)
-    const availableCreators = creators.filter((c) => !linkedCreatorIds.includes(c.id))
     const stateLabel = getStateLabel(campaign.state)
 
     return (
@@ -165,7 +175,7 @@ export default function CampaignDetailPage() {
                         <input
                             type="text"
                             value={form.name}
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            onChange={(e) => setForm({...form, name: e.target.value})}
                             required
                             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -174,7 +184,7 @@ export default function CampaignDetailPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">설명</label>
                         <textarea
                             value={form.description}
-                            onChange={(e) => setForm({ ...form, description: e.target.value })}
+                            onChange={(e) => setForm({...form, description: e.target.value})}
                             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             rows={2}
                         />
@@ -184,7 +194,7 @@ export default function CampaignDetailPage() {
                         <input
                             type="url"
                             value={form.landingUrl}
-                            onChange={(e) => setForm({ ...form, landingUrl: e.target.value })}
+                            onChange={(e) => setForm({...form, landingUrl: e.target.value})}
                             required
                             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -195,7 +205,7 @@ export default function CampaignDetailPage() {
                             <input
                                 type="date"
                                 value={form.startDate}
-                                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                                onChange={(e) => setForm({...form, startDate: e.target.value})}
                                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
@@ -204,7 +214,7 @@ export default function CampaignDetailPage() {
                             <input
                                 type="date"
                                 value={form.endDate}
-                                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                                onChange={(e) => setForm({...form, endDate: e.target.value})}
                                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
@@ -221,23 +231,38 @@ export default function CampaignDetailPage() {
 
             <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-lg font-semibold mb-4">트래킹 링크 생성</h2>
-                {availableCreators.length === 0 ? (
-                    <p className="text-gray-500 text-sm">모든 크리에이터에게 링크가 발급되었거나, 등록된 크리에이터가 없습니다.</p>
+                {creators.length === 0 || channels.length === 0 ? (
+                    <p className="text-gray-500 text-sm">
+                        {creators.length === 0 && '크리에이터를 먼저 등록해주세요. '}
+                        {channels.length === 0 && '채널을 먼저 등록해주세요.'}
+                    </p>
                 ) : (
-                    <div className="flex gap-2">
-                        <select
-                            value={selectedCreator}
-                            onChange={(e) => setSelectedCreator(e.target.value)}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">크리에이터 선택</option>
-                            {availableCreators.map((c) => (
-                                <option key={c.id} value={c.id}>{c.name} ({c.channelName})</option>
-                            ))}
-                        </select>
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                            <select
+                                value={selectedCreator}
+                                onChange={(e) => setSelectedCreator(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">크리에이터 선택</option>
+                                {creators.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.name} ({c.channelName})</option>
+                                ))}
+                            </select>
+                            <select
+                                value={selectedChannel}
+                                onChange={(e) => setSelectedChannel(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">채널 선택</option>
+                                {channels.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.platform} &gt; {c.placement}</option>
+                                ))}
+                            </select>
+                        </div>
                         <button
                             onClick={handleCreateLink}
-                            disabled={!selectedCreator || submitting}
+                            disabled={!selectedCreator || !selectedChannel || submitting}
                             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                         >
                             {submitting ? '생성 중...' : '링크 생성'}
@@ -255,17 +280,75 @@ export default function CampaignDetailPage() {
                         <thead className="bg-gray-50">
                         <tr>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">크리에이터</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">채널</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">트래킹 링크</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">액션</th>
                         </tr>
                         </thead>
+                        {/*<tbody className="divide-y divide-gray-200">*/}
+                        {/*{links.map((link) => {*/}
+                        {/*    const creator = creators.find((c) => c.id === link.creatorId)*/}
+                        {/*    const creatorName = creator?.name || `ID: ${link.creatorId}`*/}
+                        {/*    return (*/}
+                        {/*        <tr key={link.id}>*/}
+                        {/*            <td className="px-4 py-3">{creatorName}</td>*/}
+                        {/*            <td className="px-4 py-3 text-sm text-gray-600">{link.channelDisplay || '-'}</td>*/}
+                        {/*            <td className="px-4 py-3 text-sm font-mono text-gray-600">*/}
+                        {/*                /t/{link.slug}*/}
+                        {/*            </td>*/}
+                        {/*            <td className="px-4 py-3">*/}
+                        {/*                <button*/}
+                        {/*                    onClick={() => copyToClipboard(link.slug)}*/}
+                        {/*                    className="text-blue-600 hover:underline text-sm mr-3"*/}
+                        {/*                >*/}
+                        {/*                    복사*/}
+                        {/*                </button>*/}
+                        {/*                <button*/}
+                        {/*                    onClick={() => handleDeleteLink(link.id, creatorName)}*/}
+                        {/*                    className="text-red-600 hover:underline text-sm"*/}
+                        {/*                >*/}
+                        {/*                    삭제*/}
+                        {/*                </button>*/}
+                        {/*            </td>*/}
+                        {/*        </tr>*/}
+                        {/*    )*/}
+                        {/*})}*/}
+                        {/*</tbody>*/}
                         <tbody className="divide-y divide-gray-200">
                         {links.map((link) => {
                             const creator = creators.find((c) => c.id === link.creatorId)
                             const creatorName = creator?.name || `ID: ${link.creatorId}`
+                            const channel = channels.find((c) => c.id === link.channelId)
                             return (
                                 <tr key={link.id}>
                                     <td className="px-4 py-3">{creatorName}</td>
+                                    {/*<td className="px-4 py-3">*/}
+                                    {/*    <div className="flex items-center gap-2">*/}
+                                    {/*        {channel?.iconUrl ? (*/}
+                                    {/*            <img src={channel.iconUrl} alt=""*/}
+                                    {/*                 className="w-6 h-6 rounded object-contain bg-gray-50"/>*/}
+                                    {/*        ) : (*/}
+                                    {/*            <div className="w-6 h-6 rounded bg-gray-200"></div>*/}
+                                    {/*        )}*/}
+                                    {/*        <span className="text-sm text-gray-600">{link.channelDisplay || '-'}</span>*/}
+                                    {/*    </div>*/}
+                                    {/*</td>*/}
+
+
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            {channel?.iconUrl ? (
+                                                <img src={channel.iconUrl} alt=""
+                                                     className="w-8 h-8 rounded object-contain bg-gray-50"/>
+                                            ) : (
+                                                <div className="w-8 h-8 rounded bg-gray-200"></div>
+                                            )}
+                                            <span className="text-sm text-gray-600">
+                                            {link.channelDisplay || (channel ? `${channel.platform} > ${channel.placement}` : '-')}
+                                            </span>
+                                        </div>
+                                    </td>
+
                                     <td className="px-4 py-3 text-sm font-mono text-gray-600">
                                         /t/{link.slug}
                                     </td>

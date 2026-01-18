@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage'
 import CampaignsPage from './pages/CampaignsPage'
 import CampaignDetailPage from './pages/CampaignDetailPage'
 import CreatorsPage from './pages/CreatorsPage'
+import ChannelsPage from './pages/ChannelsPage'
 
 function App() {
     return (
@@ -21,6 +22,7 @@ function App() {
                     <Route path="campaigns" element={<CampaignsPage />} />
                     <Route path="campaigns/:id" element={<CampaignDetailPage />} />
                     <Route path="creators" element={<CreatorsPage />} />
+                    <Route path="channels" element={<ChannelsPage />} />
                 </Route>
             </Routes>
         </AuthProvider>
