@@ -149,7 +149,8 @@ public class CreatorService {
                             "먼저 관련 트래킹 링크를 비활성화(삭제) 해주세요."
             );
         }
-
+    //  정합성 강제: creator가 죽으면 연결된 ACTIVE 링크도 같이 죽는다
+        trackingLinkRepository.deactivateAllByCreatorId(id, Status.ACTIVE, Status.INACTIVE);
         creator.deactivate();
     }
 

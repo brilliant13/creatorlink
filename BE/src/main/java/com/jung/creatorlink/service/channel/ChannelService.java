@@ -9,6 +9,7 @@ import com.jung.creatorlink.dto.channel.ChannelPatchRequest;
 import com.jung.creatorlink.dto.channel.ChannelResponse;
 import com.jung.creatorlink.dto.channel.ChannelUpdateRequest;
 import com.jung.creatorlink.repository.channel.ChannelRepository;
+import com.jung.creatorlink.repository.tracking.TrackingLinkRepository;
 import com.jung.creatorlink.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional
 public class ChannelService {
+    private final TrackingLinkRepository trackingLinkRepository;
     private final ChannelRepository channelRepository;
     private final UserRepository userRepository;
 
@@ -238,7 +240,8 @@ public class ChannelService {
         if (!channel.getAdvertiser().getId().equals(advertiserId)) {
             throw new IllegalArgumentException("이 채널을 삭제할 권한이 없습니다.");
         }
-
+        //  정합성 강제
+        trackingLinkRepository.deactivateAllByChannelId(channelId, Status.ACTIVE, Status.INACTIVE);
         channel.deactivate();
     }
 

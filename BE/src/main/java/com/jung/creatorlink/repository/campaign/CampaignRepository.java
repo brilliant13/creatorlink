@@ -10,4 +10,8 @@ public interface CampaignRepository extends JpaRepository<Campaign, Long> {
     //특정 광고주가 가진 캠페인 목록
 //    List<Campaign> findByAdvertiserId(Long advertiserId);
     List<Campaign> findAllByAdvertiserIdAndStatus(Long advertiserId, Status status);
+
+    //CampaignRepository 소유권+ACTIVE 검증용 메서드
+    boolean existsByIdAndAdvertiser_IdAndStatus(Long id, Long advertiserId, Status status);
+
 }

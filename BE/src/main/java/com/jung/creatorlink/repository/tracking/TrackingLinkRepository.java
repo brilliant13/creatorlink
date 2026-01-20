@@ -3,6 +3,9 @@ package com.jung.creatorlink.repository.tracking;
 import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.tracking.TrackingLink;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +30,35 @@ public interface TrackingLinkRepository extends JpaRepository<TrackingLink, Long
 
     boolean existsByCampaign_IdAndCreator_IdAndChannel_IdAndStatus(
             Long campaignId, Long creatorId, Long channelId, Status status
+    );
+
+    //KPI(링크 수) + 정합성 강제(일괄 비활성) 추가
+    long countByCampaign_IdAndStatus(Long campaignId, Status status);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update TrackingLink tl
+           set tl.status = :inactive
+         where tl.creator.id = :creatorId
+           and tl.status = :active
+    """)
+    int deactivateAllByCreatorId(
+            @Param("creatorId") Long creatorId,
+            @Param("active") Status active,
+            @Param("inactive") Status inactive
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update TrackingLink tl
+           set tl.status = :inactive
+         where tl.channel.id = :channelId
+           and tl.status = :active
+    """)
+    int deactivateAllByChannelId(
+            @Param("channelId") Long channelId,
+            @Param("active") Status active,
+            @Param("inactive") Status inactive
     );
 
 
