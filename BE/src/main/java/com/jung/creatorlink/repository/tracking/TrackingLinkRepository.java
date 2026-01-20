@@ -8,19 +8,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TrackingLinkRepository extends JpaRepository<TrackingLink, Long> {
-
-//    Optional<TrackingLink> findBySlug(String slug);
-//
-//    boolean existsBySlug(String slug);
-//
-//    // 캠페인 ID 기준 모든 트래킹 링크 조회
-//    List<TrackingLink> findAllByCampaignId(Long campaignId);
-//
-//    boolean existsByCampaign_Id(Long campaignId);
-//
-//    boolean existsByCreator_Id(Long creatorId);
-
-
     // 리다이렉트용: ACTIVE 인 slug 만 유효
     Optional<TrackingLink> findBySlugAndStatus(String slug, Status status);
 
@@ -41,5 +28,7 @@ public interface TrackingLinkRepository extends JpaRepository<TrackingLink, Long
     boolean existsByCampaign_IdAndCreator_IdAndChannel_IdAndStatus(
             Long campaignId, Long creatorId, Long channelId, Status status
     );
+
+
 
 }

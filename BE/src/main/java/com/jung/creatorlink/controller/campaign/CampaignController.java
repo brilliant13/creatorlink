@@ -66,7 +66,7 @@ public class CampaignController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "캠페인 삭제",
-            description = "광고주가 소유한 캠페인을 삭제한다. "
+            description = "광고주가 소유한 캠페인을 삭제(Soft delete)한다. "
                     + "단, 연결된 트래킹 링크가 있으면 삭제 불가.")
     public void deleteCampaign(
             @PathVariable Long id,

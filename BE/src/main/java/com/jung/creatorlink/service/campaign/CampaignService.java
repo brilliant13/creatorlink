@@ -1,6 +1,7 @@
 package com.jung.creatorlink.service.campaign;
 
 
+import com.jung.creatorlink.common.exception.ResourceNotFoundException;
 import com.jung.creatorlink.domain.campaign.Campaign;
 import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.domain.user.User;
@@ -71,13 +72,20 @@ public class CampaignService {
                 .toList();
     }
 
+    //단건 조회
     @Transactional(readOnly = true)
     public CampaignResponse getCampaign(Long campaignId, Long advertiserId) {
         Campaign campaign = campaignRepository.findById(campaignId)
-                .orElseThrow(() -> new IllegalArgumentException("캠패인을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResourceNotFoundException("캠페인을 찾을 수 없습니다."));
+//                .orElseThrow(() -> new IllegalArgumentException("캠패인을 찾을 수 없습니다."));
 
         if (!campaign.getAdvertiser().getId().equals(advertiserId)) {
-            throw new IllegalArgumentException("해당 광고주의 캠페인이 아닙니다.");
+//            throw new IllegalArgumentException("해당 광고주의 캠페인이 아닙니다.");
+            throw new ResourceNotFoundException("캠페인을 찾을 수 없습니다.");
+        }
+        if (campaign.getStatus() != Status.ACTIVE) { // INACTIVE 숨김
+//            throw new IllegalArgumentException("캠페인을 찾을 수 없습니다.");
+            throw new ResourceNotFoundException("캠페인을 찾을 수 없습니다.");
         }
 //        return toResponse(campaign);
         return CampaignResponse.from(campaign);

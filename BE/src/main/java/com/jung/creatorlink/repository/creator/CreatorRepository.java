@@ -11,4 +11,5 @@ public interface CreatorRepository extends JpaRepository<Creator, Long> {
 //    List<Creator> findAllByAdvertiserId(Long advertiserId);
 //    List<Creator> findAllByAdvertiserId(Long advertiserId);
     List<Creator> findAllByAdvertiserIdAndStatus(Long advertiserId, Status status);
+
 }

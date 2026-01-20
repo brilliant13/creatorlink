@@ -21,14 +21,14 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_tracking_links_campaign_status", columnList = "campaign_id, status"),
                 @Index(name = "idx_tracking_links_creator_status", columnList = "creator_id, status"),
                 @Index(name = "idx_tracking_links_channel_status", columnList = "channel_id, status")
-        },
-        uniqueConstraints = {
-                // 같은 조합 중복 생성 방지 (Soft delete 재발급 고려: status 포함)
-                @UniqueConstraint(
-                        name = "uk_links_campaign_creator_channel_status",
-                        columnNames = {"campaign_id", "creator_id", "channel_id", "status"}
-                )
         }
+//        uniqueConstraints = {
+//                // 같은 조합 중복 생성 방지 (Soft delete 재발급 고려: status 포함)
+//                @UniqueConstraint(
+//                        name = "uk_links_campaign_creator_channel_status",
+//                        columnNames = {"campaign_id", "creator_id", "channel_id", "status"}
+//                )
+//        }
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

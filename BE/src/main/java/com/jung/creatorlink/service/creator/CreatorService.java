@@ -71,6 +71,10 @@ public class CreatorService {
         if (!creator.getAdvertiser().getId().equals(advertiserId)) {
             throw new IllegalArgumentException("해당 크리에이터에 접근할 권한이 없습니다.");
         }
+
+        if (creator.getStatus() != Status.ACTIVE) { // INACTIVE 숨김
+            throw new IllegalArgumentException("크리에이터를 찾을 수 없습니다.");
+        }
 //        return toResponse(creator);
         return CreatorResponse.from(creator);
     }

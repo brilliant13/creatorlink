@@ -62,7 +62,7 @@ public class CreatorController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "크리에이터 삭제",
-            description = "광고주가 소유한 크리에이터를 삭제한다. "
+            description = "광고주가 소유한 크리에이터를 삭제(Soft delete)한다. "
                     + "단, 연결된 트래킹 링크가 있으면 삭제 불가.")
     public void deleteCreator(
             @PathVariable Long id,
