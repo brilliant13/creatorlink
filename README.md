@@ -19,22 +19,6 @@
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Problem & Solution](#problem--solution)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Database Design](#database-design)
-- [Core Flows](#core-flows)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [API Documentation](#api-documentation)
-- [Performance Testing](#performance-testing)
-- [Project Structure](#project-structure)
-- [Roadmap](#roadmap)
-- [Contact](#contact)
-
-## 📋 Table of Contents
-
 - [Overview](#-overview)
 - [Problem & Solution](#-problem--solution)
 - [Features](#-features)
