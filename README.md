@@ -405,7 +405,7 @@ k6 run --vus 100 --duration 5m scripts/mixed-traffic.js
 
 ---
 
-## 📁 Project Structure (EC2)
+## 📁 Project Structure
 ```
 BE/
 ├── src/
