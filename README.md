@@ -14,7 +14,6 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
 </div>
-
 ---
 
 ## 📋 Table of Contents
@@ -238,9 +237,6 @@ CreatorLink는 **링크 클릭 로그 기반으로 성과를 정량화**하고,
 - 비동기 로깅 검토 (리다이렉트 지연 최소화)
 - Redis 캐싱으로 DB 부하 감소
 
-<details>
-<summary><b>📈 더 많은 Flow 다이어그램</b></summary>
-
 ### 2. Dashboard Statistics Flow
 
 ![Dashboard Stats Flow](docs/images/3-3-2flow-dashboard-stats.png)
@@ -258,8 +254,6 @@ CreatorLink는 **링크 클릭 로그 기반으로 성과를 정량화**하고,
 - Creator × Channel 조합별 성과 비교 (0 클릭 포함)
 - 채널 랭킹 Top-N 조회
 - 복합 JOIN 쿼리 + 인덱싱 최적화
-
-</details>
 
 ---
 
