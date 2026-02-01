@@ -1,11 +1,13 @@
 package com.jung.creatorlink.service.stats;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.jung.creatorlink.common.exception.ResourceNotFoundException;
 import com.jung.creatorlink.domain.common.Status;
 import com.jung.creatorlink.dto.stats.*;
 import com.jung.creatorlink.repository.campaign.CampaignRepository;
 import com.jung.creatorlink.repository.tracking.ClickLogRepository;
 import com.jung.creatorlink.repository.tracking.TrackingLinkRepository;
+import com.jung.creatorlink.service.cache.StatsCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,15 @@ public class StatsService {
     private final ClickLogRepository clickLogRepository;
     private final CampaignRepository campaignRepository;
     private final TrackingLinkRepository trackingLinkRepository;
+
+    private static final TypeReference<List<CombinationStatsResponse>> COMB_LIST =
+            new TypeReference<>() {};
+
+    private static final TypeReference<List<ChannelRankingResponse>> RANK_LIST =
+            new TypeReference<>() {};
+
+    private final StatsCacheService statsCacheService;
+
 
     // KPI (캠페인 성과 탭 상단 카드)
     public CampaignKpiResponse getCampaignKpi(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
@@ -56,15 +67,95 @@ public class StatsService {
                 activeLinks
         );
     }
+
     // UC-10-1: 조합별 성과 비교
+    // 캐시적용
     public List<CombinationStatsResponse> getCombinationStats(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
         validateRange(from, to);
         validateCampaignOwnership(campaignId, advertiserId);
 
+        String key = buildCombinationKey(campaignId, from, to);
+
+        return statsCacheService
+                .get(key, COMB_LIST)
+                .orElseGet(() -> {
+                    List<CombinationStatsResponse> result = queryCombinationFromDB(campaignId, from, to);
+                    statsCacheService.set(key, result);
+                    return result;
+                });
+    }
+//    public List<CombinationStatsResponse> getCombinationStats(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
+//        validateRange(from, to);
+//        validateCampaignOwnership(campaignId, advertiserId);
+//
+//        LocalDate today = LocalDate.now(KST);
+//        LocalDateTime todayStart = today.atStartOfDay();
+//        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+//
+//        LocalDateTime fromStart = from.atStartOfDay();
+//        LocalDateTime toEndExclusive = to.plusDays(1).atStartOfDay();
+//
+//        return clickLogRepository.findCombinationStats(
+//                campaignId,
+//                Status.ACTIVE,
+//                todayStart,
+//                tomorrowStart,
+//                fromStart,
+//                toEndExclusive
+//        );
+//    }
+
+    // UC-10-2: 채널 랭킹 Top-N
+    //캐시 적용
+    public List<ChannelRankingResponse> getChannelRanking(Long campaignId, Long advertiserId, LocalDate from, LocalDate to, int limit) {
+        validateRange(from, to);
+        validateCampaignOwnership(campaignId, advertiserId);
+
+        int safeLimit = clampLimit(limit);
+        String key = buildChannelRankingKey(campaignId, from, to, safeLimit);
+
+        return statsCacheService
+                .get(key, RANK_LIST)
+                .orElseGet(() -> {
+                    List<ChannelRankingResponse> result = queryChannelRankingFromDB(campaignId, from, to, safeLimit);
+                    statsCacheService.set(key, result);
+                    return result;
+                });
+    }
+
+//    public List<ChannelRankingResponse> getChannelRanking(Long campaignId, Long advertiserId, LocalDate from, LocalDate to, int limit) {
+//        validateRange(from, to);
+//        validateCampaignOwnership(campaignId, advertiserId);
+//
+//        int safeLimit = clampLimit(limit);
+//
+//        LocalDateTime fromStart = from.atStartOfDay();
+//        LocalDateTime toEndExclusive = to.plusDays(1).atStartOfDay();
+//
+//        return clickLogRepository.findChannelRanking(
+//                campaignId,
+//                Status.ACTIVE,
+//                fromStart,
+//                toEndExclusive,
+//                PageRequest.of(0, safeLimit)
+//        );
+//    }
+// ========== 캐시 키 생성 ==========
+
+    private String buildCombinationKey(Long campaignId, LocalDate from, LocalDate to) {
+        return String.format("stats:comb:%d:%s:%s", campaignId, from, to);
+    }
+
+    private String buildChannelRankingKey(Long campaignId, LocalDate from, LocalDate to, int limit) {
+        return String.format("stats:rank:%d:%s:%s:%d", campaignId, from, to, limit);
+    }
+
+// ========== DB 집계 로직 (기존 로직 분리) ==========
+
+    private List<CombinationStatsResponse> queryCombinationFromDB(Long campaignId, LocalDate from, LocalDate to) {
         LocalDate today = LocalDate.now(KST);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
-
         LocalDateTime fromStart = from.atStartOfDay();
         LocalDateTime toEndExclusive = to.plusDays(1).atStartOfDay();
 
@@ -78,13 +169,7 @@ public class StatsService {
         );
     }
 
-    // UC-10-2: 채널 랭킹 Top-N
-    public List<ChannelRankingResponse> getChannelRanking(Long campaignId, Long advertiserId, LocalDate from, LocalDate to, int limit) {
-        validateRange(from, to);
-        validateCampaignOwnership(campaignId, advertiserId);
-
-        int safeLimit = clampLimit(limit);
-
+    private List<ChannelRankingResponse> queryChannelRankingFromDB(Long campaignId, LocalDate from, LocalDate to, int limit) {
         LocalDateTime fromStart = from.atStartOfDay();
         LocalDateTime toEndExclusive = to.plusDays(1).atStartOfDay();
 
@@ -93,7 +178,7 @@ public class StatsService {
                 Status.ACTIVE,
                 fromStart,
                 toEndExclusive,
-                PageRequest.of(0, safeLimit)
+                PageRequest.of(0, limit)
         );
     }
 
