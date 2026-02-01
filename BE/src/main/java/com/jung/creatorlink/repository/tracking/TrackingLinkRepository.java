@@ -61,6 +61,10 @@ public interface TrackingLinkRepository extends JpaRepository<TrackingLink, Long
             @Param("inactive") Status inactive
     );
 
+    @Query(value = "SELECT slug FROM tracking_links WHERE status = 'ACTIVE' LIMIT :limit", nativeQuery = true)
+    List<String> findActiveSlugs(@Param("limit") int limit);
+
+
 
 
 }
