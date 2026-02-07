@@ -56,6 +56,7 @@ public class Campaign {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private Status status = Status.ACTIVE;
 
     public void deactivate() {

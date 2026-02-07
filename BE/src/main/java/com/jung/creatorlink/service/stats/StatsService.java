@@ -78,9 +78,9 @@ public class StatsService {
 
         return statsCacheService
                 .get(key, COMB_LIST)
-                .orElseGet(() -> {
+                .orElseGet(() -> { // 캐시 미스(또는 enabled=false) 시 DB 조회
                     List<CombinationStatsResponse> result = queryCombinationFromDB(campaignId, from, to);
-                    statsCacheService.set(key, result);
+                    statsCacheService.set(key, result); // enabled=true일 때만 저장
                     return result;
                 });
     }

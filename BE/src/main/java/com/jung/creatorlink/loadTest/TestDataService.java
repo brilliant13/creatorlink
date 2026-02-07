@@ -186,7 +186,8 @@ public class TestDataService {
 
     private String generateSlug() {
         // 충돌 확률을 사실상 0으로 만들기 위해 길이를 12로
-        return randomSlug(12);
+        //return randomSlug(12);
+        return UUID.randomUUID().toString().replace("-", "") + randomSlug(6);
     }
 
     private String randomSlug(int len) {
