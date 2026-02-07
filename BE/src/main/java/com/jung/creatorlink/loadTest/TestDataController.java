@@ -59,4 +59,5 @@ public class TestDataController {
         List<String> slugs = testDataService.getActiveSlugs(limit);
         return ResponseEntity.ok(slugs);
     }
+
 }

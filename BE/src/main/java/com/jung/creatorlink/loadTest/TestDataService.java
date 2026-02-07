@@ -14,16 +14,20 @@ import com.jung.creatorlink.repository.tracking.TrackingLinkRepository;
 import com.jung.creatorlink.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -165,6 +169,98 @@ public class TestDataService {
                 channels.size(),
                 totalLinks
         );
+    }
+
+    @Transactional
+    public SeedClickLogsResult seedClickLogs(SeedClickLogsRequest req) {
+        long start = System.currentTimeMillis();
+
+        // 1) 캠페인 내 ACTIVE tracking_link_id 전부 로드
+        List<Long> linkIds = jdbcTemplate.queryForList(
+                "SELECT id FROM tracking_links WHERE campaign_id = ? AND status = 'ACTIVE'",
+                Long.class,
+                req.getCampaignId()
+        );
+
+        if (linkIds.isEmpty()) {
+            throw new IllegalArgumentException("ACTIVE tracking_links가 없습니다. 먼저 /api/test/seed로 링크를 생성하세요.");
+        }
+
+        // 2) “hot links” 풀 구성 (편향)
+        List<Long> hot = pickHotLinks(linkIds, req.getHotLinkTopK());
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+
+        // 3) 시간 범위 계산 (KST 기준으로 분산)
+        ZoneId KST = ZoneId.of("Asia/Seoul");
+        LocalDate today = LocalDate.now(KST);
+
+        // daysBackFrom(예:90) ~ daysBackTo(예:30) 사이 랜덤 날짜/시간
+        int from = Math.max(req.getDaysBackFrom(), req.getDaysBackTo());
+        int to = Math.min(req.getDaysBackFrom(), req.getDaysBackTo());
+
+        int total = req.getTotalRows();
+        int batchSize = Math.max(1000, req.getBatchSize());
+
+        String sql = "INSERT INTO click_logs (clicked_at, ip, referer, user_agent, tracking_link_id) " +
+                "VALUES (?, ?, ?, ?, ?)";
+
+        int inserted = 0;
+
+        for (int offset = 0; offset < total; offset += batchSize) {
+            int size = Math.min(batchSize, total - offset);
+
+            // batchUpdate: PreparedStatement 재사용 + 네트워크 왕복 최소화
+            int[] res = jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
+                @Override
+                public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    // ---- tracking_link_id 선택 (skew) ----
+                    long trackingLinkId;
+                    if (req.getSkewRatio() > 0 && !hot.isEmpty() && rnd.nextDouble() < req.getSkewRatio()) {
+                        trackingLinkId = hot.get(rnd.nextInt(hot.size()));
+                    } else {
+                        trackingLinkId = linkIds.get(rnd.nextInt(linkIds.size()));
+                    }
+
+                    // ---- clicked_at 분산 ----
+                    // 날짜: today - [to..from]일
+                    int daysBack = rnd.nextInt(to, from + 1);
+                    LocalDate d = today.minusDays(daysBack);
+
+                    // 시간: 하루 중 랜덤 (0~86399초)
+                    int sec = rnd.nextInt(0, 24 * 60 * 60);
+                    LocalDateTime clickedAt = d.atStartOfDay().plusSeconds(sec);
+
+                    // ---- optional columns ----
+                    // IP/UA/Referer는 NULL로 넣어도 됨. (desc에서 NULL 허용)
+                    ps.setTimestamp(1, Timestamp.valueOf(clickedAt));
+                    ps.setString(2, null);   // ip
+                    ps.setString(3, null);   // referer
+                    ps.setString(4, null);   // user_agent
+                    ps.setLong(5, trackingLinkId);
+                }
+
+                @Override
+                public int getBatchSize() {
+                    return size;
+                }
+            });
+
+//            inserted += Arrays.stream(res).sum();
+            inserted += size; //“정확한 inserted”는 필요하면 마지막에 SELECT COUNT(*)로 확인하면 됨.
+        }
+
+        long elapsed = System.currentTimeMillis() - start;
+        return new SeedClickLogsResult(inserted, elapsed);
+    }
+
+    private List<Long> pickHotLinks(List<Long> linkIds, int topK) {
+        if (topK <= 0) return Collections.emptyList();
+        int k = Math.min(topK, linkIds.size());
+        // “상위 K개”의 의미는 사실 랜덤으로 K개 뽑아도 “쏠림” 재현은 됨
+        // (진짜 랭킹 기반 hot이 필요하면 click_counts 같은 테이블/쿼리가 있어야 함)
+        List<Long> copy = new ArrayList<>(linkIds);
+        Collections.shuffle(copy);
+        return copy.subList(0, k);
     }
 
     @Transactional(readOnly = true)
