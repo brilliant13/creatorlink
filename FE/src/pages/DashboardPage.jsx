@@ -5,6 +5,12 @@ import {getCampaigns} from '../api/campaigns'
 import {getCreators} from '../api/creators'
 import {BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell} from 'recharts'
 
+const formatNumber = (num) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
+    return num.toLocaleString()
+}
+
 export default function DashboardPage() {
     const {user} = useAuth()
     const [campaignStats, setCampaignStats] = useState([])
@@ -251,10 +257,14 @@ export default function DashboardPage() {
                                         <div className="flex items-center gap-2 shrink-0 ml-2">
                                             {stat.todayClicks > 0 && (
                                                 <span className="text-xs text-orange-500">
-                                        오늘 +{stat.todayClicks}
+                                        {/*오늘 +{stat.todayClicks}*/}
+                                                    오늘 +{formatNumber(stat.todayClicks)}
                                     </span>
                                             )}
-                                            <span className="font-medium w-8 text-right">{stat.totalClicks.toLocaleString()}</span>
+                                            {/*<span className="font-medium w-8 text-right">{stat.totalClicks.toLocaleString()}</span>*/}
+                                            <span className="font-medium min-w-[60px] text-right">
+                                                {formatNumber(stat.totalClicks)}
+                                            </span>
                                         </div>
                                     </li>
                                 )
@@ -273,21 +283,28 @@ export default function DashboardPage() {
                                 <li key={stat.creatorId} className="flex justify-between items-center">
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                         {index === 0 && stat.totalClicks > 0 && (
-                                            <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800 shrink-0">
+                                            <span
+                                                className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800 shrink-0">
                                     TOP
                                 </span>
                                         )}
-                                        <span className={`truncate ${index === 0 && stat.totalClicks > 0 ? 'font-medium' : ''}`}>
+                                        <span
+                                            className={`truncate ${index === 0 && stat.totalClicks > 0 ? 'font-medium' : ''}`}>
                                 {stat.creatorName}
                             </span>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0 ml-2">
                                         {stat.todayClicks > 0 && (
                                             <span className="text-xs text-orange-500">
-                                    오늘 +{stat.todayClicks}
+                                    {/*오늘 +{stat.todayClicks}*/}
+                                                오늘 +{formatNumber(stat.todayClicks)}
                                 </span>
                                         )}
-                                        <span className="font-medium w-8 text-right">{stat.totalClicks.toLocaleString()}</span>
+                                        {/*<span*/}
+                                        {/*    className="font-medium w-8 text-right">{stat.totalClicks.toLocaleString()}</span>*/}
+                                        <span className="font-medium min-w-[60px] text-right">
+                                            {formatNumber(stat.totalClicks)}
+                                        </span>
                                     </div>
                                 </li>
                             ))}
