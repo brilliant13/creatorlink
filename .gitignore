@@ -43,3 +43,6 @@ FE/build/
 
 # macOS
 .DS_Store
+
+# uploads (runtime files)
+uploads/
