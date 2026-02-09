@@ -13,6 +13,7 @@ import com.jung.creatorlink.repository.tracking.ClickLogRepository;
 import com.jung.creatorlink.repository.tracking.TrackingLinkRepository;
 import com.jung.creatorlink.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,6 +30,7 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TestDataService {
@@ -89,6 +91,9 @@ public class TestDataService {
                     .build());
         }
         campaigns = campaignRepository.saveAll(campaigns);
+//        if (campaigns.isEmpty()) {
+//            throw new IllegalStateException("No campaigns created");
+//        }
 
         // 이번 실험은 “캠페인 1개 기준 UC-10”이 편하니까 첫 번째만 사용
         Campaign campaign = campaigns.get(0);
@@ -110,13 +115,48 @@ public class TestDataService {
         creators = creatorRepository.saveAll(creators);
 
         // 4) channels 생성 (platform+placement)
+//        List<Channel> channels = new ArrayList<>();
+//        String[] platforms = {"Instagram", "YouTube", "Blog", "TikTok", "X"};
+//        String[] placements = {"Story", "Feed", "Description", "Body", "Bio"};
+//
+//        for (int i = 0; i < req.getChannels(); i++) {
+//            String platform = platforms[i % platforms.length];
+//            String placement = placements[i % placements.length];
+//            channels.add(Channel.builder()
+//                    .advertiser(user)
+//                    .platform(platform)
+//                    .placement(placement)
+//                    .displayName(platform + " + " + placement)
+//                    .note("seed")
+//                    .status(Status.ACTIVE)
+//                    .createdAt(now)    // ← 추가!
+//                    .updatedAt(now)    // ← 추가!
+//                    .build());
+//        }
+//        channels = channelRepository.saveAll(channels);
+
+
+        // 4) channels 생성 (platform+placement) - 중복 없이 생성
         List<Channel> channels = new ArrayList<>();
+
         String[] platforms = {"Instagram", "YouTube", "Blog", "TikTok", "X"};
         String[] placements = {"Story", "Feed", "Description", "Body", "Bio"};
 
-        for (int i = 0; i < req.getChannels(); i++) {
-            String platform = platforms[i % platforms.length];
-            String placement = placements[i % placements.length];
+// 모든 조합 생성 (최대 25개)
+        List<String[]> combos = new ArrayList<>();
+        for (String p : platforms) {
+            for (String pl : placements) {
+                combos.add(new String[]{p, pl});
+            }
+        }
+
+// 요청 개수 상한 처리 (25 초과면 25로 clamp)
+        int channelCount = Math.min(req.getChannels(), combos.size());
+
+        for (int i = 0; i < channelCount; i++) {
+            String platform = combos.get(i)[0];
+            String placement = combos.get(i)[1];
+
             channels.add(Channel.builder()
                     .advertiser(user)
                     .platform(platform)
@@ -124,40 +164,92 @@ public class TestDataService {
                     .displayName(platform + " + " + placement)
                     .note("seed")
                     .status(Status.ACTIVE)
-                    .createdAt(now)    // ← 추가!
-                    .updatedAt(now)    // ← 추가!
+                    .createdAt(now)
+                    .updatedAt(now)
                     .build());
         }
+
         channels = channelRepository.saveAll(channels);
+
 
         // 5) tracking_links 대량 생성 (creator당 linksPerCreator)
 //        int totalLinks = req.getCreators() * req.getLinksPerCreator();
-        int totalLinks = creators.size() * req.getLinksPerCreator();
+//        int totalLinks = creators.size() * req.getLinksPerCreator();
+//
+//        List<TrackingLink> buffer = new ArrayList<>(5000);
+//
+//        for (Creator c : creators) {
+//            for (int j = 0; j < req.getLinksPerCreator(); j++) {
+//                Channel ch = channels.get(random.nextInt(channels.size()));
+//                TrackingLink tl = TrackingLink.builder()
+//                        .campaign(campaign)
+//                        .creator(c)
+//                        .channel(ch)
+//                        .finalUrl(req.getLandingUrl())
+//                        .status(Status.ACTIVE)
+////                        .slug(generateUniqueSlugWithRetry())
+//                        .slug(generateSlug())
+//                        .createdAt(now)  // ← 추가!
+//                        .build();
+//                buffer.add(tl);
+//
+//                // 배치 flush (JPA saveAll chunk)
+//                if (buffer.size() >= 5000) {
+//                    trackingLinkRepository.saveAll(buffer);
+//                    buffer.clear();
+//                }
+//            }
+//        }
+//        if (!buffer.isEmpty()) {
+//            trackingLinkRepository.saveAll(buffer);
+//        }
+
+        // 5) tracking_links 대량 생성 (creator당 linksPerCreator)
+// 제약: (campaign_id, creator_id, channel_id, status) UNIQUE
+// => 같은 캠페인에서 같은 creator는 같은 channel로 ACTIVE 링크를 2개 만들 수 없음
+
+        int linksPerCreator = req.getLinksPerCreator();
+        int maxLinksPerCreator = channels.size(); // channel 중복 금지면 여기까지가 상한
+        int actualLinksPerCreator = Math.min(linksPerCreator, maxLinksPerCreator);
+
+        if (linksPerCreator > maxLinksPerCreator) {
+            // 운영에선 로그만 남기거나 예외로 막는 것도 선택
+            // throw new IllegalArgumentException("linksPerCreator는 channels 개수 이하로 설정해야 합니다.");
+            log.warn("linksPerCreator({}) > channels({}) 이므로 {}로 clamp 합니다.",
+                    linksPerCreator, maxLinksPerCreator, actualLinksPerCreator);
+        }
+
+        int totalLinks = creators.size() * actualLinksPerCreator;
 
         List<TrackingLink> buffer = new ArrayList<>(5000);
 
         for (Creator c : creators) {
-            for (int j = 0; j < req.getLinksPerCreator(); j++) {
-                Channel ch = channels.get(random.nextInt(channels.size()));
+            // creator마다 채널을 섞어서 "중복 없이" 앞에서 N개만 사용
+            List<Channel> shuffled = new ArrayList<>(channels);
+            Collections.shuffle(shuffled, random);
+
+            for (int j = 0; j < actualLinksPerCreator; j++) {
+                Channel ch = shuffled.get(j);
+
                 TrackingLink tl = TrackingLink.builder()
                         .campaign(campaign)
                         .creator(c)
                         .channel(ch)
                         .finalUrl(req.getLandingUrl())
                         .status(Status.ACTIVE)
-//                        .slug(generateUniqueSlugWithRetry())
                         .slug(generateSlug())
-                        .createdAt(now)  // ← 추가!
+                        .createdAt(now)
                         .build();
+
                 buffer.add(tl);
 
-                // 배치 flush (JPA saveAll chunk)
                 if (buffer.size() >= 5000) {
                     trackingLinkRepository.saveAll(buffer);
                     buffer.clear();
                 }
             }
         }
+
         if (!buffer.isEmpty()) {
             trackingLinkRepository.saveAll(buffer);
         }
@@ -167,7 +259,8 @@ public class TestDataService {
                 campaigns.size(),
                 creators.size(),
                 channels.size(),
-                totalLinks
+                totalLinks,
+                campaign.getId()     // 추가 (seed -> seed-clicklogs 사용위해)
         );
     }
 
@@ -206,23 +299,29 @@ public class TestDataService {
 
         int inserted = 0;
 
+        //offset은 매 반복마다 batchSize만큼 증가한다. 0 -> 5000 -> 10000 -> .. 이런 식으로.
         for (int offset = 0; offset < total; offset += batchSize) {
+            //마지막 배치가 남은 수만큼 넣도록. 마지막 찌꺼기 처리하기 위해서. total-offset =2000이면
+            //size = min(5000,2000) = 2000 이렇게 딱 totalRows만큼 정확히 넣고 마지막에 남은 게 있어도 처리됨.
             int size = Math.min(batchSize, total - offset);
 
             // batchUpdate: PreparedStatement 재사용 + 네트워크 왕복 최소화
+            //jdbcTemplate.batchUpdate메서드가 모든 걸 처리한다.
             int[] res = jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
                 @Override
                 public void setValues(PreparedStatement ps, int i) throws SQLException {
                     // ---- tracking_link_id 선택 (skew) ----
+                    //1) trackint_link_id 랜덤 선택
                     long trackingLinkId;
                     if (req.getSkewRatio() > 0 && !hot.isEmpty() && rnd.nextDouble() < req.getSkewRatio()) {
-                        trackingLinkId = hot.get(rnd.nextInt(hot.size()));
+                        trackingLinkId = hot.get(rnd.nextInt(hot.size())); //hot에서 꺼냄
                     } else {
-                        trackingLinkId = linkIds.get(rnd.nextInt(linkIds.size()));
+                        trackingLinkId = linkIds.get(rnd.nextInt(linkIds.size())); // 전체에서 꺼냄
                     }
 
                     // ---- clicked_at 분산 ----
                     // 날짜: today - [to..from]일
+                    //2) clicked_at 랜덤 날짜/시간
                     int daysBack = rnd.nextInt(to, from + 1);
                     LocalDate d = today.minusDays(daysBack);
 
@@ -236,14 +335,14 @@ public class TestDataService {
                     ps.setString(2, null);   // ip
                     ps.setString(3, null);   // referer
                     ps.setString(4, null);   // user_agent
-                    ps.setLong(5, trackingLinkId);
+                    ps.setLong(5, trackingLinkId);//여기까지는 준비만 (DB 전송 아님)
                 }
 
                 @Override
                 public int getBatchSize() {
-                    return size;
+                    return size; //5000
                 }
-            });
+            }); //이 줄이 끝나면 이미 DB에 INSERT 완료된다.
 
 //            inserted += Arrays.stream(res).sum();
             inserted += size; //“정확한 inserted”는 필요하면 마지막에 SELECT COUNT(*)로 확인하면 됨.
@@ -275,7 +374,8 @@ public class TestDataService {
             try {
                 // UNIQUE(slug)는 DB가 보장. 여기서는 save 시점에 터질 수 있음.
                 return slug;
-            } catch (DataIntegrityViolationException ignored) {}
+            } catch (DataIntegrityViolationException ignored) {
+            }
         }
         return UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     }

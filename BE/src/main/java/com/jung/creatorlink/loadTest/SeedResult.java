@@ -12,4 +12,7 @@ public class SeedResult {
     private int creators;
     private int channels;
     private int trackingLinks;
+
+    //다음 단계 seed-clicklogs에 바로 쓸 값
+    private long campaignId;
 }

@@ -60,4 +60,21 @@ public class TestDataController {
         return ResponseEntity.ok(slugs);
     }
 
+    // 4) ClickLog 대량 시드 적재 (S3-B: 1,000만 rows 등)
+    @PostMapping("/seed-clicklogs")
+    @Operation(
+            summary = "ClickLog 대량 데이터 생성",
+            description = "부하테스트를 위한 ClickLog(클릭 이벤트) 데이터를 대량 생성한다. " +
+                    "campaignId의 ACTIVE tracking_links를 대상으로 기간 분산/편향 옵션을 적용해 INSERT한다."
+    )
+    public ResponseEntity<?> seedClickLogs(
+            @RequestHeader("X-TEST-TOKEN") String token,
+            @RequestBody SeedClickLogsRequest req
+    ) {
+        tokenGuard.check(token);
+        SeedClickLogsResult result = testDataService.seedClickLogs(req);
+        return ResponseEntity.ok(result);
+    }
+
+
 }

@@ -48,7 +48,7 @@ public interface TrackingLinkRepository extends JpaRepository<TrackingLink, Long
             @Param("inactive") Status inactive
     );
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying( flushAutomatically = true) //clearAutomatically = true,
     @Query("""
         update TrackingLink tl
            set tl.status = :inactive
