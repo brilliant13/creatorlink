@@ -8,7 +8,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // target: 'http://localhost:8080',
+        target: 'http://3.238.233.53:8080', //EC2 IP
         changeOrigin: true,
       },
       '/t':{

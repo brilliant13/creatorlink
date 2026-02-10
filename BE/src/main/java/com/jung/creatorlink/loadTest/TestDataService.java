@@ -135,7 +135,6 @@ public class TestDataService {
 //        }
 //        channels = channelRepository.saveAll(channels);
 
-
         // 4) channels 생성 (platform+placement) - 중복 없이 생성
         List<Channel> channels = new ArrayList<>();
 
@@ -205,8 +204,8 @@ public class TestDataService {
 //        }
 
         // 5) tracking_links 대량 생성 (creator당 linksPerCreator)
-// 제약: (campaign_id, creator_id, channel_id, status) UNIQUE
-// => 같은 캠페인에서 같은 creator는 같은 channel로 ACTIVE 링크를 2개 만들 수 없음
+        // 제약: (campaign_id, creator_id, channel_id, status) UNIQUE
+        // => 같은 캠페인에서 같은 creator는 같은 channel로 ACTIVE 링크를 2개 만들 수 없음
 
         int linksPerCreator = req.getLinksPerCreator();
         int maxLinksPerCreator = channels.size(); // channel 중복 금지면 여기까지가 상한
@@ -223,6 +222,12 @@ public class TestDataService {
 
         List<TrackingLink> buffer = new ArrayList<>(5000);
 
+        int activeCnt = 0;
+        int inactiveCnt = 0;
+
+        double inactiveRatio = req.getInactiveLinkRatio(); // 0.0 ~ 0.99
+        inactiveRatio = Math.max(0.0, Math.min(0.99, inactiveRatio));
+
         for (Creator c : creators) {
             // creator마다 채널을 섞어서 "중복 없이" 앞에서 N개만 사용
             List<Channel> shuffled = new ArrayList<>(channels);
@@ -231,12 +236,21 @@ public class TestDataService {
             for (int j = 0; j < actualLinksPerCreator; j++) {
                 Channel ch = shuffled.get(j);
 
+                //status 섞기 (inactive/active)
+                Status status = (random.nextDouble() < inactiveRatio)
+                        ? Status.INACTIVE
+                        : Status.ACTIVE;
+
+                if (status == Status.ACTIVE) activeCnt++;
+                else inactiveCnt++;
+
                 TrackingLink tl = TrackingLink.builder()
                         .campaign(campaign)
                         .creator(c)
                         .channel(ch)
                         .finalUrl(req.getLandingUrl())
-                        .status(Status.ACTIVE)
+//                        .status(Status.ACTIVE)
+                        .status(status)
                         .slug(generateSlug())
                         .createdAt(now)
                         .build();
@@ -254,14 +268,35 @@ public class TestDataService {
             trackingLinkRepository.saveAll(buffer);
         }
 
-        return new SeedResult(
-                user.getId(),
-                campaigns.size(),
-                creators.size(),
-                channels.size(),
-                totalLinks,
-                campaign.getId()     // 추가 (seed -> seed-clicklogs 사용위해)
-        );
+        if (activeCnt < 100) {
+            log.warn("ACTIVE tracking_links too low: {}. Consider lowering inactiveLinkRatio={}", activeCnt, inactiveRatio);
+        }
+
+
+        return SeedResult.builder()
+                .userId(user.getId())
+                .campaigns(campaigns.size())
+                .creators(creators.size())
+                .channels(channels.size())
+                .trackingLinksTotal(totalLinks)
+                .trackingLinksActive(activeCnt)
+                .trackingLinksInactive(inactiveCnt)
+                .inactiveLinkRatioApplied(inactiveRatio)
+                .campaignId(campaign.getId()) // 추가 (seed -> seed-clicklogs 사용위해)
+                .build();
+
+
+//        return new SeedResult(
+//                user.getId(),
+//                campaigns.size(),
+//                creators.size(),
+//                channels.size(),
+//                totalLinks,
+//                activeCnt,
+//                inactiveCnt,
+//                inactiveRatio,
+//                campaign.getId()     // 추가 (seed -> seed-clicklogs 사용위해)
+//        );
     }
 
     @Transactional
