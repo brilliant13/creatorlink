@@ -17,6 +17,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,8 @@ public class StatsService {
     private final CampaignRepository campaignRepository;
     private final TrackingLinkRepository trackingLinkRepository;
 
+    private final Map<String, Object> locks = new ConcurrentHashMap<>();
+
     private static final TypeReference<List<CombinationStatsResponse>> COMB_LIST =
             new TypeReference<>() {
             };
@@ -36,6 +41,8 @@ public class StatsService {
             new TypeReference<>() {
             };
 
+    //Stampede 방지용 키별 락 저장소
+    //같은 캐시 키에 대해 동시 요청이 오면 1개만 DB 조회하도록 순차 처리
     private final StatsCacheService statsCacheService;
 
 
@@ -71,21 +78,58 @@ public class StatsService {
     }
 
     // UC-10-1: 조합별 성과 비교
-    // 캐시적용
-    public List<CombinationStatsResponse> getCombinationStats(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
-        validateRange(from, to);
-        validateCampaignOwnership(campaignId, advertiserId);
+    // Stampede 방지, 락 추가
+    public List<CombinationStatsResponse> getCombinationStats(
+            Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
+        validateRange(from, to); // ← 모든 스레드가 자유롭게 실행
+        validateCampaignOwnership(campaignId, advertiserId); // ← 여기도 자유롭게 실행
 
         String key = buildCombinationKey(campaignId, from, to);
 
-        return statsCacheService
-                .get(key, COMB_LIST)
-                .orElseGet(() -> { // 캐시 미스(또는 enabled=false) 시 DB 조회
-                    List<CombinationStatsResponse> result = queryCombinationFromDB(campaignId, from, to);
-                    statsCacheService.set(key, result); // enabled=true일 때만 저장
-                    return result;
-                });
+        // 1차 캐시 확인 (HIT면 바로 반환, DB 안 감)
+        Optional<List<CombinationStatsResponse>> cached = statsCacheService.get(key, COMB_LIST);
+        if (cached.isPresent()) return cached.get(); // ← HIT면 여기서 바로 반환, 대기 없음
+
+        // 캐시 MISS → 같은 키에 대해 락 획득 (Stampede 방지)
+        // 동일 키 요청이 100개 동시에 오면, 1개만 락 획득하고 나머지 99개는 여기서 대기
+        // lock 안 걸면: Cache MISS나고 100개가 동시에 DB 커넥션 풀 요구하는 순간 timeout시간 측정 시작함. HikariCP default 30s 지나면 timeout error 발생.
+        Object lock = locks.computeIfAbsent(key, k -> new Object());
+        synchronized (lock) {  // ← ★ 여기서 대기 발생
+            // 이 블록 안에는 한 번에 1개 스레드만 들어감
+            try {
+                // 2차 캐시 확인 (Double-check)
+                // 대기하는 동안 먼저 들어간 스레드가 캐시를 채웠을 수 있음
+                cached = statsCacheService.get(key, COMB_LIST);
+                if (cached.isPresent()) return cached.get();
+
+                // 첫 번째 스레드만 DB 집계 실행 → 결과를 캐시에 저장
+                var result = queryCombinationFromDB(campaignId, from, to); // DB 조회
+                statsCacheService.set(key, result);
+                return result;
+            } finally {
+                // 락 해제 → 대기 중이던 스레드들이 깨어나서 2차 확인에서 HIT
+                locks.remove(key);
+            }
+        } // ← 나오면 다음 스레드가 들어감
     }
+
+    // 캐시적용
+//    public List<CombinationStatsResponse> getCombinationStats(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
+//        validateRange(from, to);
+//        validateCampaignOwnership(campaignId, advertiserId);
+//
+//        String key = buildCombinationKey(campaignId, from, to);
+//
+//        return statsCacheService
+//                .get(key, COMB_LIST)
+//                .orElseGet(() -> { // 캐시 미스(또는 enabled=false) 시 DB 조회
+//                    List<CombinationStatsResponse> result = queryCombinationFromDB(campaignId, from, to); //여기서 커넥션 획득
+//                    statsCacheService.set(key, result); // enabled=true일 때만 저장
+//                    return result;
+//                });
+//    }
+
+    //캐시 미적용
 //    public List<CombinationStatsResponse> getCombinationStats(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
 //        validateRange(from, to);
 //        validateCampaignOwnership(campaignId, advertiserId);
@@ -108,23 +152,53 @@ public class StatsService {
 //    }
 
     // UC-10-2: 채널 랭킹 Top-N
-    //캐시 적용
-    public List<ChannelRankingResponse> getChannelRanking(Long campaignId, Long advertiserId, LocalDate from, LocalDate to, int limit) {
+    // Stampede 방지, 락 추가
+    public List<ChannelRankingResponse> getChannelRanking(
+            Long campaignId, Long advertiserId, LocalDate from, LocalDate to, int limit) {
         validateRange(from, to);
         validateCampaignOwnership(campaignId, advertiserId);
 
         int safeLimit = clampLimit(limit);
         String key = buildChannelRankingKey(campaignId, from, to, safeLimit);
 
-        return statsCacheService
-                .get(key, RANK_LIST)
-                .orElseGet(() -> {
-                    List<ChannelRankingResponse> result = queryChannelRankingFromDB(campaignId, from, to, safeLimit);
-                    statsCacheService.set(key, result);
-                    return result;
-                });
+        // 1차 캐시 확인
+        Optional<List<ChannelRankingResponse>> cached = statsCacheService.get(key, RANK_LIST);
+        if (cached.isPresent()) return cached.get();
+
+        // Stampede 방지: 같은 키에 대해 1개 스레드만 DB 조회
+        Object lock = locks.computeIfAbsent(key, k -> new Object());
+        synchronized (lock) {
+            try {
+                // Double-check: 대기 중 다른 스레드가 캐시 채웠는지 확인
+                cached = statsCacheService.get(key, RANK_LIST);
+                if (cached.isPresent()) return cached.get();
+
+                var result = queryChannelRankingFromDB(campaignId, from, to, safeLimit);
+                statsCacheService.set(key, result);
+                return result;
+            } finally {
+                locks.remove(key);
+            }
+        }
     }
 
+    //캐시 적용
+//    public List<ChannelRankingResponse> getChannelRanking(Long campaignId, Long advertiserId, LocalDate from, LocalDate to, int limit) {
+//        validateRange(from, to);
+//        validateCampaignOwnership(campaignId, advertiserId);
+//
+//        int safeLimit = clampLimit(limit);
+//        String key = buildChannelRankingKey(campaignId, from, to, safeLimit);
+//
+//        return statsCacheService
+//                .get(key, RANK_LIST)
+//                .orElseGet(() -> {
+//                    List<ChannelRankingResponse> result = queryChannelRankingFromDB(campaignId, from, to, safeLimit);
+//                    statsCacheService.set(key, result);
+//                    return result;
+//                });
+//    }
+    //캐시 미적용
 //    public List<ChannelRankingResponse> getChannelRanking(Long campaignId, Long advertiserId, LocalDate from, LocalDate to, int limit) {
 //        validateRange(from, to);
 //        validateCampaignOwnership(campaignId, advertiserId);
