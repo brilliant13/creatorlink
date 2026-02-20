@@ -81,11 +81,14 @@ public class StatsService {
     // Stampede 방지, 락 추가
     public List<CombinationStatsResponse> getCombinationStats(
             Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
-        validateRange(from, to); // ← 모든 스레드가 자유롭게 실행
-        validateCampaignOwnership(campaignId, advertiserId); // ← 여기도 자유롭게 실행
+        validateRange(from, to); // ← 모든 스레드가 자유롭게 실행 //OK - 커넥션 불필요
 
-        String key = buildCombinationKey(campaignId, from, to);
+        String key = buildCombinationKey(campaignId, from, to); //검증 전에 키생성
 
+//        validateCampaignOwnership(campaignId, advertiserId); // ← 여기도 자유롭게 실행 //얘가 campaignRepository.existBy()호출하면서 커넥션 획득 시도한다. -> 커넥션 풀(10개) 고갈 ->27% timeout
+
+
+        //캐시 확인 먼저
         // 1차 캐시 확인 (HIT면 바로 반환, DB 안 감)
         Optional<List<CombinationStatsResponse>> cached = statsCacheService.get(key, COMB_LIST);
         if (cached.isPresent()) return cached.get(); // ← HIT면 여기서 바로 반환, 대기 없음
@@ -101,6 +104,9 @@ public class StatsService {
                 // 대기하는 동안 먼저 들어간 스레드가 캐시를 채웠을 수 있음
                 cached = statsCacheService.get(key, COMB_LIST);
                 if (cached.isPresent()) return cached.get();
+
+                //여기서 validation(첫 요청만 실행)
+                validateCampaignOwnership(campaignId, advertiserId);
 
                 // 첫 번째 스레드만 DB 집계 실행 → 결과를 캐시에 저장
                 var result = queryCombinationFromDB(campaignId, from, to); // DB 조회
