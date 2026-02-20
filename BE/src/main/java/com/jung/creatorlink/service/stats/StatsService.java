@@ -23,13 +23,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+//@Transactional(readOnly = true)
 public class StatsService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final ClickLogRepository clickLogRepository;
     private final CampaignRepository campaignRepository;
     private final TrackingLinkRepository trackingLinkRepository;
+    //Stampede 방지용 키별 락 저장소
+    //같은 캐시 키에 대해 동시 요청이 오면 1개만 DB 조회하도록 순차 처리
+    private final StatsCacheService statsCacheService;
 
     private final Map<String, Object> locks = new ConcurrentHashMap<>();
 
@@ -41,42 +44,9 @@ public class StatsService {
             new TypeReference<>() {
             };
 
-    //Stampede 방지용 키별 락 저장소
-    //같은 캐시 키에 대해 동시 요청이 오면 1개만 DB 조회하도록 순차 처리
-    private final StatsCacheService statsCacheService;
 
-
-    // KPI (캠페인 성과 탭 상단 카드)
-    public CampaignKpiResponse getCampaignKpi(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
-        validateRange(from, to);
-        validateCampaignOwnership(campaignId, advertiserId);
-
-        LocalDate today = LocalDate.now(KST);
-        LocalDateTime todayStart = today.atStartOfDay();
-        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
-
-        LocalDateTime fromStart = from.atStartOfDay();
-        LocalDateTime toEndExclusive = to.plusDays(1).atStartOfDay();
-
-        CampaignKpiClicksAgg clicksAgg = clickLogRepository.findCampaignKpiClicks(
-                campaignId,
-                Status.ACTIVE,
-                todayStart,
-                tomorrowStart,
-                fromStart,
-                toEndExclusive
-        );
-
-        long activeLinks = trackingLinkRepository.countByCampaign_IdAndStatus(campaignId, Status.ACTIVE);
-
-        return new CampaignKpiResponse(
-                clicksAgg.getTodayClicks(),
-                clicksAgg.getRangeClicks(),
-                clicksAgg.getTotalClicks(),
-                activeLinks
-        );
-    }
-
+    // ========== 캐시 적용 메서드 (Stampede 방지, public, @Transactional 없음) ====================
+    // ========== 캐시 적용 (캐시 HIT 시 DB 접근 안 함) ==========
     // UC-10-1: 조합별 성과 비교
     // Stampede 방지, 락 추가
     public List<CombinationStatsResponse> getCombinationStats(
@@ -223,18 +193,88 @@ public class StatsService {
 //        );
 //    }
 
-    // ========== 캐시 키 생성 ==========
-    private String buildCombinationKey(Long campaignId, LocalDate from, LocalDate to) {
-        return String.format("stats:comb:%d:%s:%s", campaignId, from, to);
+
+    // ========== 캐시 미적용 메서드 (항상 DB 접근) (public, @Transactional 있음) ==========
+    // KPI (캠페인 성과 탭 상단 카드)
+    @Transactional(readOnly = true)
+    public CampaignKpiResponse getCampaignKpi(Long campaignId, Long advertiserId, LocalDate from, LocalDate to) {
+        validateRange(from, to);
+        validateCampaignOwnership(campaignId, advertiserId);
+
+        LocalDate today = LocalDate.now(KST);
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+
+        LocalDateTime fromStart = from.atStartOfDay();
+        LocalDateTime toEndExclusive = to.plusDays(1).atStartOfDay();
+
+        CampaignKpiClicksAgg clicksAgg = clickLogRepository.findCampaignKpiClicks(
+                campaignId,
+                Status.ACTIVE,
+                todayStart,
+                tomorrowStart,
+                fromStart,
+                toEndExclusive
+        );
+
+        long activeLinks = trackingLinkRepository.countByCampaign_IdAndStatus(campaignId, Status.ACTIVE);
+
+        return new CampaignKpiResponse(
+                clicksAgg.getTodayClicks(),
+                clicksAgg.getRangeClicks(),
+                clicksAgg.getTotalClicks(),
+                activeLinks
+        );
     }
 
-    private String buildChannelRankingKey(Long campaignId, LocalDate from, LocalDate to, int limit) {
-        return String.format("stats:rank:%d:%s:%s:%d", campaignId, from, to, limit);
+    // 광고주별 크리에이터 클릭 통계
+    @Transactional(readOnly = true)
+    public List<CreatorStatsResponse> getCreatorStats(Long advertiserId) {
+//        return clickLogRepository.findCreatorStatsByAdvertiserId(advertiserId);
+        var today = LocalDate.now();
+        var startOfDay = today.atStartOfDay();
+        var endOfDay = today.plusDays(1).atStartOfDay(); // 다음날 0시 직전까지
+
+        return clickLogRepository.findCreatorStatsByAdvertiserId(
+                advertiserId,
+                startOfDay,
+                endOfDay
+        );
     }
 
-// ========== DB 집계 로직 (기존 로직 분리) ==========
+    // 광고주별 캠페인 클릭 통계
+    @Transactional(readOnly = true)
+    public List<CampaignStatsResponse> getCampaignStats(Long advertiserId) {
+//        return clickLogRepository.findCampaignStatsByAdvertiserId(advertiserId);
+        var today = LocalDate.now();
+        var startOfDay = today.atStartOfDay();
+        var endOfDay = today.plusDays(1).atStartOfDay();
 
-    private List<CombinationStatsResponse> queryCombinationFromDB(Long campaignId, LocalDate from, LocalDate to) {
+        return clickLogRepository.findCampaignStatsByAdvertiserId(
+                advertiserId,
+                startOfDay,
+                endOfDay
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public TodayStatsResponse getTodayStats(Long advertiserId) {
+        LocalDate today = LocalDate.now(); // 필요하면 ZoneId.of("Asia/Seoul")로 조정 가능
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime startOfTomorrow = today.plusDays(1).atStartOfDay();
+
+        Long count = clickLogRepository.countTodayClicks(advertiserId, startOfDay, startOfTomorrow);
+        if (count == null) {
+            count = 0L;
+        }
+
+        return new TodayStatsResponse(count);
+    }
+
+    // ========== 내부 DB 조회 메서드 (캐시용, @Transactional 필요) ==========
+    // ========== 내부 헬퍼 (실제 DB 쿼리 실행, DB접근) ==========
+    @Transactional(readOnly = true)
+    List<CombinationStatsResponse> queryCombinationFromDB(Long campaignId, LocalDate from, LocalDate to) {
         LocalDate today = LocalDate.now(KST);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
@@ -251,7 +291,8 @@ public class StatsService {
         );
     }
 
-    private List<ChannelRankingResponse> queryChannelRankingFromDB(Long campaignId, LocalDate from, LocalDate to, int limit) {
+    @Transactional(readOnly = true)
+    List<ChannelRankingResponse> queryChannelRankingFromDB(Long campaignId, LocalDate from, LocalDate to, int limit) {
         LocalDateTime fromStart = from.atStartOfDay();
         LocalDateTime toEndExclusive = to.plusDays(1).atStartOfDay();
 
@@ -264,7 +305,8 @@ public class StatsService {
         );
     }
 
-    private void validateCampaignOwnership(Long campaignId, Long advertiserId) {
+    @Transactional(readOnly = true)
+    void validateCampaignOwnership(Long campaignId, Long advertiserId) {
         boolean ok = campaignRepository.existsByIdAndAdvertiser_IdAndStatus(campaignId, advertiserId, Status.ACTIVE);
         if (!ok) {
             // “삭제/비활성은 안 보인다” 정책: 404로 숨김
@@ -272,6 +314,7 @@ public class StatsService {
         }
     }
 
+    // ========== Utility 메서드 (DB 접근 없음) ==========
     private void validateRange(LocalDate from, LocalDate to) {
         if (from == null || to == null) {
             throw new IllegalArgumentException("from/to는 필수입니다.");
@@ -286,44 +329,13 @@ public class StatsService {
         return Math.min(limit, 50);
     }
 
-    // 광고주별 크리에이터 클릭 통계
-    public List<CreatorStatsResponse> getCreatorStats(Long advertiserId) {
-//        return clickLogRepository.findCreatorStatsByAdvertiserId(advertiserId);
-        var today = LocalDate.now();
-        var startOfDay = today.atStartOfDay();
-        var endOfDay = today.plusDays(1).atStartOfDay(); // 다음날 0시 직전까지
-
-        return clickLogRepository.findCreatorStatsByAdvertiserId(
-                advertiserId,
-                startOfDay,
-                endOfDay
-        );
+    // ========== 캐시 키 생성 ==========
+    private String buildCombinationKey(Long campaignId, LocalDate from, LocalDate to) {
+        return String.format("stats:comb:%d:%s:%s", campaignId, from, to);
     }
 
-    // 광고주별 캠페인 클릭 통계
-    public List<CampaignStatsResponse> getCampaignStats(Long advertiserId) {
-//        return clickLogRepository.findCampaignStatsByAdvertiserId(advertiserId);
-        var today = LocalDate.now();
-        var startOfDay = today.atStartOfDay();
-        var endOfDay = today.plusDays(1).atStartOfDay();
-
-        return clickLogRepository.findCampaignStatsByAdvertiserId(
-                advertiserId,
-                startOfDay,
-                endOfDay
-        );
+    private String buildChannelRankingKey(Long campaignId, LocalDate from, LocalDate to, int limit) {
+        return String.format("stats:rank:%d:%s:%s:%d", campaignId, from, to, limit);
     }
 
-    public TodayStatsResponse getTodayStats(Long advertiserId) {
-        LocalDate today = LocalDate.now(); // 필요하면 ZoneId.of("Asia/Seoul")로 조정 가능
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime startOfTomorrow = today.plusDays(1).atStartOfDay();
-
-        Long count = clickLogRepository.countTodayClicks(advertiserId, startOfDay, startOfTomorrow);
-        if (count == null) {
-            count = 0L;
-        }
-
-        return new TodayStatsResponse(count);
-    }
 }
