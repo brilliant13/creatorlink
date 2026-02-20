@@ -114,27 +114,6 @@ public class TestDataService {
         }
         creators = creatorRepository.saveAll(creators);
 
-        // 4) channels 생성 (platform+placement)
-//        List<Channel> channels = new ArrayList<>();
-//        String[] platforms = {"Instagram", "YouTube", "Blog", "TikTok", "X"};
-//        String[] placements = {"Story", "Feed", "Description", "Body", "Bio"};
-//
-//        for (int i = 0; i < req.getChannels(); i++) {
-//            String platform = platforms[i % platforms.length];
-//            String placement = placements[i % placements.length];
-//            channels.add(Channel.builder()
-//                    .advertiser(user)
-//                    .platform(platform)
-//                    .placement(placement)
-//                    .displayName(platform + " + " + placement)
-//                    .note("seed")
-//                    .status(Status.ACTIVE)
-//                    .createdAt(now)    // ← 추가!
-//                    .updatedAt(now)    // ← 추가!
-//                    .build());
-//        }
-//        channels = channelRepository.saveAll(channels);
-
         // 4) channels 생성 (platform+placement) - 중복 없이 생성
         List<Channel> channels = new ArrayList<>();
 
@@ -169,39 +148,6 @@ public class TestDataService {
         }
 
         channels = channelRepository.saveAll(channels);
-
-
-        // 5) tracking_links 대량 생성 (creator당 linksPerCreator)
-//        int totalLinks = req.getCreators() * req.getLinksPerCreator();
-//        int totalLinks = creators.size() * req.getLinksPerCreator();
-//
-//        List<TrackingLink> buffer = new ArrayList<>(5000);
-//
-//        for (Creator c : creators) {
-//            for (int j = 0; j < req.getLinksPerCreator(); j++) {
-//                Channel ch = channels.get(random.nextInt(channels.size()));
-//                TrackingLink tl = TrackingLink.builder()
-//                        .campaign(campaign)
-//                        .creator(c)
-//                        .channel(ch)
-//                        .finalUrl(req.getLandingUrl())
-//                        .status(Status.ACTIVE)
-////                        .slug(generateUniqueSlugWithRetry())
-//                        .slug(generateSlug())
-//                        .createdAt(now)  // ← 추가!
-//                        .build();
-//                buffer.add(tl);
-//
-//                // 배치 flush (JPA saveAll chunk)
-//                if (buffer.size() >= 5000) {
-//                    trackingLinkRepository.saveAll(buffer);
-//                    buffer.clear();
-//                }
-//            }
-//        }
-//        if (!buffer.isEmpty()) {
-//            trackingLinkRepository.saveAll(buffer);
-//        }
 
         // 5) tracking_links 대량 생성 (creator당 linksPerCreator)
         // 제약: (campaign_id, creator_id, channel_id, status) UNIQUE
@@ -357,8 +303,8 @@ public class TestDataService {
                     // ---- clicked_at 분산 ----
                     // 날짜: today - [to..from]일
                     //2) clicked_at 랜덤 날짜/시간
-                    int daysBack = rnd.nextInt(to, from + 1);
-                    LocalDate d = today.minusDays(daysBack);
+                    int daysBack = rnd.nextInt(to, from + 1); //각 클릭마다 30~90 중 랜덤
+                    LocalDate d = today.minusDays(daysBack); //오늘에서 뺀다.
 
                     // 시간: 하루 중 랜덤 (0~86399초)
                     int sec = rnd.nextInt(0, 24 * 60 * 60);

@@ -29,10 +29,12 @@ public class StatsService {
     private final TrackingLinkRepository trackingLinkRepository;
 
     private static final TypeReference<List<CombinationStatsResponse>> COMB_LIST =
-            new TypeReference<>() {};
+            new TypeReference<>() {
+            };
 
     private static final TypeReference<List<ChannelRankingResponse>> RANK_LIST =
-            new TypeReference<>() {};
+            new TypeReference<>() {
+            };
 
     private final StatsCacheService statsCacheService;
 
@@ -140,8 +142,8 @@ public class StatsService {
 //                PageRequest.of(0, safeLimit)
 //        );
 //    }
-// ========== 캐시 키 생성 ==========
 
+    // ========== 캐시 키 생성 ==========
     private String buildCombinationKey(Long campaignId, LocalDate from, LocalDate to) {
         return String.format("stats:comb:%d:%s:%s", campaignId, from, to);
     }

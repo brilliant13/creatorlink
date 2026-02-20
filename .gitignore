@@ -46,3 +46,5 @@ FE/build/
 
 # uploads (runtime files)
 uploads/
+
+dump.rdb

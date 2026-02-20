@@ -38,7 +38,8 @@ public <T> Optional<T> get(String key, Class<T> type) {
     }
 }
 
-    // List 등 제네릭 타입용 (추가)
+    // List 등 제네릭 타입용 //Java의 Type Erasure 때문. Class<T>로는 List 안에 뭐가 들어있는지를 Jackson에게 알려줄 방법이 없다.
+    //따라서 Jackson이 제공하는 TypeReference를 사용한다.
     public <T> Optional<T> get(String key, TypeReference<T> typeRef) {
         if (!props.isEnabled()) return Optional.empty();
 
@@ -53,7 +54,7 @@ public <T> Optional<T> get(String key, Class<T> type) {
             return Optional.of(objectMapper.readValue(json, typeRef));
         } catch (Exception e) {
             log.warn("Cache deserialization failed for key: {}", key, e);
-            return Optional.empty();
+            return Optional.empty(); //예외 대신 빈 값 반환 -> DB fallback
         }
     }
 
@@ -69,8 +70,7 @@ public <T> Optional<T> get(String key, Class<T> type) {
             );
             log.debug("Cache SET: {} (TTL: {}s)", key, props.getTtlSeconds());
         } catch (Exception e) {
-            log.warn("Cache serialization failed for key: {}", key, e);
-            // 캐시 실패는 기능 실패로 치지 않음
+            log.warn("Cache serialization failed for key: {}", key, e); // 캐시 실패는 기능 실패로 치지 않음
         }
     }
 
